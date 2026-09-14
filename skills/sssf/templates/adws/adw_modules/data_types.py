@@ -301,34 +301,45 @@ class PromptEngineering(BaseModel):
     user: str                       # path to user.md
 
 
+class TimeoutConfig(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    phase_seconds: int = Field(default=1800, gt=0)
+    tool_seconds: int = Field(default=300, gt=0)
+    correction_seconds: int = Field(default=300, gt=0)
+
+
 class AgentConfig(BaseModel):
+    model_config = {"extra": "forbid"}
+
     name: str
-    coding_agent: Literal["pi", "claude_code"] = "pi"
-    model: str = "google/gemini-3.6-flash"
-    thinking: str = "medium"        # off | minimal | low | medium | high | xhigh | max
-    color: str = ""                 # hex swatch for this agent's lane in the UI
+    model: str = "gpt-5.4"
+    reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] = "medium"
+    context_tier: Literal["default", "long_context"] = "default"
+    color: str = ""
     purpose: str = ""
     prompt_engineering: PromptEngineering
-    harness_engineering: list[str] = Field(default_factory=list)
-    tools: Optional[list[str]] = None    # allowlist; None = all tools usable
-    # What this agent may MODIFY in the repo, enforced in code after every call
-    # (see adw_modules/permissions.py). `tools` cannot express this: `bash` runs
-    # anything and `write` reaches any path, so an agent's capability list is a
-    # statement of intent that nothing checks.
-    #   None  -> unrestricted, except the roster-wide `protected_files` paths
-    #   []    -> read-only: may modify nothing tracked
-    #   [...] -> only these. A trailing "/" means a directory prefix; a "*"
-    #            makes it a glob; anything else is an exact path.
+    tools: Optional[list[str]] = None
+    skill_directories: list[str] = Field(default_factory=list)
+    plugin_directories: list[str] = Field(default_factory=list)
+    mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
     writes: Optional[list[str]] = None
+    timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
 
 
 class ConfigDefaults(BaseModel):
-    coding_agent: Literal["pi", "claude_code"] = "pi"
-    model: str = "google/gemini-3.6-flash"
-    thinking: str = "medium"
+    model_config = {"extra": "forbid"}
+
+    model: str = "gpt-5.4"
+    reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] = "medium"
+    context_tier: Literal["default", "long_context"] = "default"
     color: str = ""
-    harness_engineering: list[str] = Field(default_factory=list)
     tools: Optional[list[str]] = None    # roster-wide allowlist; None = all tools usable
+    skill_directories: list[str] = Field(default_factory=list)
+    plugin_directories: list[str] = Field(default_factory=list)
+    mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    writes: Optional[list[str]] = None
+    timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
     # Off-limits to every agent that has not named them in its own `writes`.
     # The factory's own code is the default: an agent must not be able to edit
     # the machinery that decides whether its work passed.
@@ -344,6 +355,8 @@ class ObservabilityConfig(BaseModel):
 
 
 class SSSFConfig(BaseModel):
+    model_config = {"extra": "forbid"}
+
     defaults: ConfigDefaults = Field(default_factory=ConfigDefaults)
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
     agents: list[AgentConfig] = Field(default_factory=list)
@@ -368,30 +381,8 @@ class EventRecord(BaseModel):
     ended_at: Optional[str] = None
 
 
-# ── Pi coding agent interface ────────────────────────────────────────────────
-
-class PiRequest(BaseModel):
-    """Everything one non-interactive pi run needs."""
-
-    prompt: str
-    system_prompt: str
-    model: str                      # registry pattern, resolved to provider + id
-    thinking: str = "medium"
-    session_id: str                 # pi --session-id: creates or continues
-    session_dir: str
-    raw_output_path: str            # JSONL stream lands here
-    tools: Optional[list[str]] = None
-    extensions: list[str] = Field(default_factory=list)
-    cwd: str = "."                  # set from run.repo_root — the codebase root agents work in
-
-
 class UsageBreakdown(BaseModel):
-    """Tokens and the dollars they cost, per component, summed over a call.
-
-    Mirrors pi's `usage` shape one-for-one so the numbers reconcile with what
-    pi itself reports: `input` EXCLUDES cache reads, which bill at their own
-    (cheaper) rate — add them to learn the size of the prompt that was sent.
-    """
+    """Normalized token and cost totals, summed over a call."""
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
@@ -409,23 +400,33 @@ class UsageBreakdown(BaseModel):
     total_cost: float = 0.0
 
     def add_turn(self, usage: dict, total_tokens: int) -> None:
-        """Fold in one pi `message_end` usage object.
+        """Fold in one normalized runtime usage record.
 
-        `total_tokens` is passed in rather than re-derived: the caller already
-        computes it pi's way (totalTokens, else the sum of the parts).
+        Runtime adapters map provider-specific responses to the stable
+        snake_case token and cost names consumed by the factory.
         """
         cost = usage.get("cost") or {}
-        self.input_tokens += usage.get("input") or 0
-        self.output_tokens += usage.get("output") or 0
-        self.cache_read_tokens += usage.get("cacheRead") or 0
-        self.cache_write_tokens += usage.get("cacheWrite") or 0
-        self.reasoning_tokens += usage.get("reasoning") or 0
+        self.input_tokens += usage.get("input_tokens") or usage.get("input") or 0
+        self.output_tokens += usage.get("output_tokens") or usage.get("output") or 0
+        self.cache_read_tokens += (
+            usage.get("cache_read_tokens") or usage.get("cacheRead") or 0
+        )
+        self.cache_write_tokens += (
+            usage.get("cache_write_tokens") or usage.get("cacheWrite") or 0
+        )
+        self.reasoning_tokens += (
+            usage.get("reasoning_tokens") or usage.get("reasoning") or 0
+        )
         self.total_tokens += total_tokens
-        self.input_cost += cost.get("input") or 0.0
-        self.output_cost += cost.get("output") or 0.0
-        self.cache_read_cost += cost.get("cacheRead") or 0.0
-        self.cache_write_cost += cost.get("cacheWrite") or 0.0
-        self.total_cost += cost.get("total") or 0.0
+        self.input_cost += usage.get("input_cost") or cost.get("input") or 0.0
+        self.output_cost += usage.get("output_cost") or cost.get("output") or 0.0
+        self.cache_read_cost += (
+            usage.get("cache_read_cost") or cost.get("cacheRead") or 0.0
+        )
+        self.cache_write_cost += (
+            usage.get("cache_write_cost") or cost.get("cacheWrite") or 0.0
+        )
+        self.total_cost += usage.get("total_cost") or cost.get("total") or 0.0
 
     def merge(self, other: "UsageBreakdown") -> None:
         """Add another call's usage — a phase that retries spends more than once."""
@@ -433,15 +434,84 @@ class UsageBreakdown(BaseModel):
             setattr(self, field, getattr(self, field) + getattr(other, field))
 
 
-class PiResult(BaseModel):
+class AgentEvent(BaseModel):
+    type: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+
+
+class AgentCallbacks(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
+    on_event: Optional[Callable[[AgentEvent], None]] = None
+
+
+class AgentRequest(BaseModel):
+    prompt: str
+    system_prompt: str
+    model: str
+    reasoning_effort: str
+    context_tier: str
+    session_id: str
+    resume: bool = False
+    runtime_dir: str
+    raw_output_path: str
+    tools: Optional[list[str]] = None
+    skill_directories: list[str] = Field(default_factory=list)
+    plugin_directories: list[str] = Field(default_factory=list)
+    mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    timeout_seconds: int = 1800
+    cwd: str = "."
+
+
+class RuntimeInfo(BaseModel):
+    sdk_version: str
+    runtime_version: str
+    protocol_version: str
+    cli_version: str = ""
+
+
+class AgentResult(BaseModel):
+    text: str = ""
+    session_id: str
+    usage: UsageBreakdown = Field(default_factory=UsageBreakdown)
+    context_tokens: int = 0
+    context_window: int = 0
+    runtime: Optional[RuntimeInfo] = None
+
+
+# Transitional adapter types keep the Pi execution backend importable until
+# the Copilot runner replaces it. They are intentionally private contracts;
+# new code should use AgentRequest and AgentResult.
+class _PiRequest(BaseModel):
+    prompt: str
+    system_prompt: str
+    model: str
+    thinking: str = "medium"
+    session_id: str
+    session_dir: str
+    raw_output_path: str
+    tools: Optional[list[str]] = None
+    extensions: list[str] = Field(default_factory=list)
+    cwd: str = "."
+
+
+class _PiResult(BaseModel):
     text: str = ""
     returncode: int = 0
     session_id: str = ""
     tokens: int = 0
     cost: float = 0.0
     usage: UsageBreakdown = Field(default_factory=UsageBreakdown)
-    # Context occupancy after the LAST turn — not a sum. `tokens` bills every
-    # turn; this is how full the window is right now, which is what the
-    # visualizer's context bar measures against `context_window`.
     context_tokens: int = 0
-    context_window: int = 0         # 0 when the registry declares no ceiling
+    context_window: int = 0
+
+
+def __getattr__(name: str):
+    """Resolve legacy Pi adapter types without making them data contracts."""
+    if name == "PiRequest":
+        return _PiRequest
+    if name == "PiResult":
+        return _PiResult
+    raise AttributeError(name)

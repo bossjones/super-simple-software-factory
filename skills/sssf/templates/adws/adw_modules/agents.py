@@ -34,10 +34,13 @@ def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConf
     raw = yaml.safe_load(Path(path).read_text()) or {}
     defaults = raw.get("defaults", {}) or {}
     for agent in raw.get("agents", []) or []:
-        for key in ("coding_agent", "model", "thinking", "color", "tools", "writes"):
+        for key in (
+            "model", "reasoning_effort", "context_tier", "color", "tools",
+            "skill_directories", "plugin_directories", "mcp_servers", "writes",
+            "timeouts",
+        ):
             if key in defaults:
                 agent.setdefault(key, defaults[key])
-        agent.setdefault("harness_engineering", defaults.get("harness_engineering", []))
     return SSSFConfig(**raw)
 
 
@@ -58,9 +61,6 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
         except SystemExit as e:
             problems.append(str(e))
             continue
-        if agent.coding_agent != "pi":
-            problems.append(f"agent {name!r}: coding_agent {agent.coding_agent!r} "
-                            f"is not implemented in v1 (pi only)")
         for label, ref in (("system", agent.prompt_engineering.system),
                            ("user", agent.prompt_engineering.user)):
             if not Path(ref).is_file():
@@ -94,13 +94,16 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     session_id = _agent_session_id(run, agent)
     run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
                                  type="agent_start", name=agent.name,
-                                 payload={"model": agent.model, "thinking": agent.thinking,
+                                 payload={"model": agent.model,
+                                          "reasoning_effort": agent.reasoning_effort,
+                                          "context_tier": agent.context_tier,
                                           "color": agent.color,
                                           "session_id": session_id,
-                                          "coding_agent": agent.coding_agent,
                                           "purpose": agent.purpose,
                                           "tools": agent.tools,  # None = all tools
-                                          "harness_engineering": agent.harness_engineering}))
+                                          "skill_directories": agent.skill_directories,
+                                          "plugin_directories": agent.plugin_directories,
+                                          "mcp_servers": agent.mcp_servers}))
     run.console.agent_started(agent.name, agent.model, session_id)
 
     # Parse retries and gate corrections re-enter the SAME pi session, so the
@@ -115,13 +118,13 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             prompt=prompt_text,
             system_prompt=system_text,
             model=agent.model,
-            thinking=agent.thinking,
+            thinking=agent.reasoning_effort,
             session_id=session_id,
             # absolute: these are read by the pi subprocess, which runs in repo_root
             session_dir=str((agent_dir / "pi_sessions").resolve()),
             raw_output_path=str((agent_dir / "raw_output.jsonl").resolve()),
             tools=agent.tools,
-            extensions=agent.harness_engineering,
+            extensions=agent.plugin_directories,
             cwd=str(run.repo_root),
         )
         result = agent_pi.run(
@@ -129,7 +132,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             on_event=_event_forwarder(run, phase, agent.name),
             on_spawn=lambda pid: run.tracer.process_start(
                 run.adw_id, "agent", agent.name, pid,
-                f"{agent.coding_agent} {agent.name} {agent.model}"),
+                f"pi {agent.name} {agent.model}"),
             on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid))
         run.add_usage(result.tokens, result.cost)
         spent.merge(result.usage)
@@ -196,7 +199,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                  context_tokens=context.context_tokens,
                                  context_window=context.context_window)
     run.save_agent_map(agent.name, {"session_id": session_id, "model": agent.model,
-                                    "coding_agent": agent.coding_agent})
+                                    "runtime": "pi"})
     run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
                                  type="handoff", name=agent.name,
                                  payload={"artifacts": envelope.artifacts,
