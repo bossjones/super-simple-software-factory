@@ -18,6 +18,9 @@ def test_plugin_manifest_uses_agent_plugins_1():
     assert manifest["$schema"] == "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
     assert manifest["name"] == "sssf"
     assert manifest["version"] == "1.0.0"
+    assert manifest["description"] == (
+        "Install and operate deterministic agents-plus-code software factory workflows."
+    )
 
 
 def test_canonical_skill_is_portable():
@@ -26,4 +29,14 @@ def test_canonical_skill_is_portable():
         "name", "description", "license", "compatibility", "metadata", "allowed-tools"
     }
     assert metadata["name"] == "sssf"
+    assert metadata["description"] == (
+        "Install and operate SSSF when creating, running, updating, or observing "
+        "deterministic AI developer workflows and their agent roster."
+    )
+    assert metadata["compatibility"] == (
+        "Requires Python 3.11+, uv, git, sqlite3, and GitHub Copilot authentication. "
+        "Bun is optional for the visualizer."
+    )
+    assert metadata["metadata"]["author"] == "bossjones"
+    assert metadata["metadata"]["version"] == "1.0.0"
     assert not (ROOT / ".claude/skills/sssf").exists()
