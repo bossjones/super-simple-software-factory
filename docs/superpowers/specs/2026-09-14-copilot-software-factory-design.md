@@ -110,7 +110,12 @@ The implementation owns:
 - Usage and context metadata mapping.
 - Deadline handling and explicit `session.abort()`.
 - Disconnect without deleting resumable session state.
-- Process/runtime cleanup.
+- SDK-managed runtime cleanup.
+
+The Python SDK does not expose the managed runtime PID through a public
+interface. SSSF must not depend on the private `_cli_process` field. The
+`processes` table continues to track the killable ADW process; `agent_start`,
+`agent_end`, and `error` events track the logical Copilot runtime lifecycle.
 
 Callers do not depend on SDK event classes, JSON-RPC method names, CLI flags, or Copilot persistence layout.
 
@@ -123,7 +128,6 @@ Adapter-neutral names describe the factory's interface even though Copilot is th
 - `AgentEvent`
 - `AgentResult`
 - `AgentUsage`
-- `RuntimeProcess`
 - `CopilotRuntimeConfig`
 - `CopilotRuntimeInfo`
 
@@ -225,7 +229,7 @@ Secrets are supplied through supported Copilot authentication mechanisms and are
 | Permission breach | Roll back unauthorized changes and fail the phase |
 | Phase timeout | Call `session.abort()`, record terminal events, and fail the phase |
 | Tool/MCP/hook failure | Preserve the native error and fail or correct according to phase policy |
-| Runtime crash | Record process exit and fail the phase |
+| Runtime crash | Record the native runtime error and fail the phase |
 | Trace persistence failure | Surface the error; do not report successful acceptance |
 
 There is no automatic fallback from the SDK to `copilot -p`.
@@ -241,10 +245,10 @@ agents:
   planner:
     model: gpt-5.4
     reasoning_effort: high
-    context: default
+    context_tier: default
     tools: [view, grep, glob]
-    skills: []
-    plugin_dirs: []
+    skill_directories: []
+    plugin_directories: []
     mcp_servers: []
     writes:
       - specs/**
@@ -517,3 +521,6 @@ The port is accepted when all of the following are true:
 - Runtime headless flags and external-runtime authentication behavior can differ between public CLI help and SDK implementation.
 - Hook failures or timeouts may not provide a fail-closed containment boundary.
 - CLI, SDK, and bundled runtime releases can drift. SSSF records and verifies all three versions rather than assuming compatibility.
+- The public Python SDK does not expose its managed runtime PID. Runtime
+  supervision uses SDK abort/stop operations while the existing process table
+  tracks the enclosing ADW process.
