@@ -297,6 +297,8 @@ class AgentCall(BaseModel):
 # ── Config ───────────────────────────────────────────────────────────────────
 
 class PromptEngineering(BaseModel):
+    model_config = {"extra": "forbid"}
+
     system: str                     # path to system.md
     user: str                       # path to user.md
 
@@ -326,6 +328,16 @@ class AgentConfig(BaseModel):
     writes: Optional[list[str]] = None
     timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
 
+    @field_validator("model")
+    @classmethod
+    def _model_must_be_unqualified(cls, value: str) -> str:
+        if "/" in value:
+            raise ValueError(
+                f"model {value!r} is provider-qualified; Copilot model names must be "
+                "unqualified (for example, use 'gpt-5.4', not 'openai/gpt-5.4')"
+            )
+        return value
+
 
 class ConfigDefaults(BaseModel):
     model_config = {"extra": "forbid"}
@@ -348,8 +360,20 @@ class ConfigDefaults(BaseModel):
     ])
     data_dir: str = "adws/adw_data"
 
+    @field_validator("model")
+    @classmethod
+    def _model_must_be_unqualified(cls, value: str) -> str:
+        if "/" in value:
+            raise ValueError(
+                f"model {value!r} is provider-qualified; Copilot model names must be "
+                "unqualified (for example, use 'gpt-5.4', not 'openai/gpt-5.4')"
+            )
+        return value
+
 
 class ObservabilityConfig(BaseModel):
+    model_config = {"extra": "forbid"}
+
     db: str = "adws/adw_data/sssf.db"
     poll_ms: int = 500
 

@@ -10,15 +10,26 @@ disposes.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
 import yaml
 
 from . import agent_pi, permissions, prompts
-from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
-                         GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
-                         UsageBreakdown)
+from .data_types import (
+    AgentCall,
+    AgentConfig,
+    EnvelopeBase,
+    EventRecord,
+    GateCheck,
+    GateReport,
+    Phase,
+    SSSFConfig,
+    UsageBreakdown,
+    _PiRequest,
+    _PiResult,
+)
 from .utils import new_id
 
 JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
@@ -40,7 +51,14 @@ def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConf
             "timeouts",
         ):
             if key in defaults:
-                agent.setdefault(key, defaults[key])
+                if key != "timeouts":
+                    agent.setdefault(key, defaults[key])
+        if "timeouts" in defaults and isinstance(defaults["timeouts"], dict):
+            agent_timeouts = agent.get("timeouts")
+            if isinstance(agent_timeouts, dict):
+                agent["timeouts"] = {**defaults["timeouts"], **agent_timeouts}
+            elif "timeouts" not in agent:
+                agent["timeouts"] = dict(defaults["timeouts"])
     return SSSFConfig(**raw)
 
 
@@ -109,12 +127,12 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # Parse retries and gate corrections re-enter the SAME pi session, so the
     # last send is the one whose context occupancy is current — while spend is
     # the opposite: every send costs, so usage accumulates across all of them.
-    latest: agent_pi.PiResult | None = None
+    latest: _PiResult | None = None
     spent = UsageBreakdown()
 
-    def send(prompt_text: str) -> agent_pi.PiResult:
+    def send(prompt_text: str) -> _PiResult:
         nonlocal latest
-        request = PiRequest(
+        request = _PiRequest(
             prompt=prompt_text,
             system_prompt=system_text,
             model=agent.model,
@@ -267,7 +285,10 @@ def _extract_json(text: str) -> dict:
     return json.loads(candidate[start:end + 1])
 
 
-def _parse_with_retries(run, phase: Phase, call: AgentCall, result, send):
+def _parse_with_retries(
+    run, phase: Phase, call: AgentCall, result: _PiResult,
+    send: Callable[[str], _PiResult],
+) -> tuple[EnvelopeBase, int]:
     """Parse the final response against the declared output type; on failure,
     continue the SAME session with a correction (bounded)."""
     for attempt in range(1, JSON_FIX_ATTEMPTS + 2):
@@ -288,6 +309,7 @@ def _parse_with_retries(run, phase: Phase, call: AgentCall, result, send):
                 f"Your response was not valid JSON for the required structure "
                 f"({error}). Respond again with ONLY a JSON object with these "
                 f"fields: {fields}. No prose, no code fences.")
+    raise AssertionError("unreachable: retry loop must return or raise")
 
 
 def _persist_envelope(run, phase: Phase, agent_name: str, call: AgentCall,

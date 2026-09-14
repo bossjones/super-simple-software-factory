@@ -39,6 +39,31 @@ def test_copilot_config_merges_defaults(tmp_path: Path):
     assert scout.timeouts.phase_seconds == 600
 
 
+def test_copilot_config_merges_partial_timeout_overrides(tmp_path: Path):
+    raw = {
+        "defaults": {
+            "timeouts": {
+                "phase_seconds": 600,
+                "tool_seconds": 120,
+                "correction_seconds": 90,
+            },
+        },
+        "agents": [{
+            "name": "scout",
+            "prompt_engineering": {"system": "system.md", "user": "user.md"},
+            "timeouts": {"phase_seconds": 42},
+        }],
+    }
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(raw))
+
+    timeouts = agents.load_config(str(path)).agents[0].timeouts
+
+    assert timeouts.phase_seconds == 42
+    assert timeouts.tool_seconds == 120
+    assert timeouts.correction_seconds == 90
+
+
 def test_removed_pi_fields_are_rejected():
     with pytest.raises(ValueError, match="coding_agent"):
         AgentConfig.model_validate({
@@ -47,6 +72,43 @@ def test_removed_pi_fields_are_rejected():
             "purpose": "Build",
             "prompt_engineering": {"system": "system.md", "user": "user.md"},
         })
+
+
+def test_nested_config_extra_fields_are_rejected():
+    with pytest.raises(ValueError, match="unexpected"):
+        AgentConfig.model_validate({
+            "name": "builder",
+            "prompt_engineering": {
+                "system": "system.md",
+                "user": "user.md",
+                "unexpected": True,
+            },
+        })
+    with pytest.raises(ValueError, match="unexpected"):
+        SSSFConfig.model_validate({"observability": {"unexpected": True}})
+
+
+def test_provider_qualified_models_are_rejected():
+    with pytest.raises(ValueError, match="provider-qualified"):
+        AgentConfig.model_validate({
+            "name": "builder",
+            "model": "google/gemini-3.6-flash",
+            "prompt_engineering": {"system": "system.md", "user": "user.md"},
+        })
+
+
+def test_provider_qualified_models_are_rejected_when_loading_yaml(tmp_path: Path):
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump({
+        "defaults": {"model": "openai/gpt-5.4"},
+        "agents": [{
+            "name": "builder",
+            "prompt_engineering": {"system": "system.md", "user": "user.md"},
+        }],
+    }))
+
+    with pytest.raises(ValueError, match="provider-qualified"):
+        agents.load_config(str(path))
 
 
 def test_default_config_is_copilot_only(repo_root: Path):
