@@ -1,0 +1,36 @@
+verbose = "info"
+no_progress = true
+output = ".cache/lychee-report.md"
+cache = false
+max_redirects = 10
+max_retries = 2
+max_concurrency = 20
+user_agent = "lychee/0.21.0"
+timeout = 20
+retry_wait_time = 2
+accept = ["200", "401", "403", "405", "429"]
+scheme = ["https", "http"]
+require_https = false
+method = "get"
+fallback_extensions = ["md", "html"]
+include_fragments = "anchor-only"
+skip_missing = false
+include_verbatim = false
+exclude = [
+  '^https?://localhost',
+  '^https?://127\.0\.0\.1',
+  '^https?://0\.0\.0\.0',
+  '^file://',
+  '^https?://.*\.local',
+  '^https?://example\.(com|org)',
+]
+exclude_path = [
+  "(^|/)node_modules/",
+  "(^|/)\\.venv/",
+  "(^|/)\\.git/",
+  "(^|/)__pycache__/",
+  "(^|/)\\.pytest_cache/",
+  "(^|/)\\.cache/",
+]
+exclude_all_private = true
+include_mail = false

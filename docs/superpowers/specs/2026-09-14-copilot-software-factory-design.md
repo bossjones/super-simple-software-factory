@@ -28,7 +28,7 @@ The design is based on primary sources verified on 2026-09-14:
 - The SDK has no native guarantee that the final assistant text conforms to an application Pydantic model. SSSF must retain host-side parsing, validation, bounded correction turns, and gates.
 - Copilot permissions, hooks, and tool filters are controls, not a complete repository containment boundary. SSSF's changed-path snapshot and rollback enforcement remains authoritative for the configured `writes` policy.
   - [Copilot hooks](https://docs.github.com/en/copilot/concepts/agents/hooks)
-  - [Copilot CLI permissions](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/manage-permissions)
+  - [Copilot CLI permissions](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/allowing-tools)
 - GitHub Copilot and Claude Code support the open Agent Skills standard. Agent Plugins 1.0 provides a portable plugin core for skills and MCP configuration, with client-specific extensions outside that core.
   - [About Agent Skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills)
   - [Agent Skills specification](https://agentskills.io/specification)
