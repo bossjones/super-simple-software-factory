@@ -17,11 +17,14 @@ include_fragments = "anchor-only"
 skip_missing = false
 include_verbatim = false
 exclude = [
+  # Local development endpoints are intentionally not publicly checkable.
   '^https?://localhost',
   '^https?://127\.0\.0\.1',
   '^https?://0\.0\.0\.0',
+  # Local files are not HTTP resources for Lychee to validate.
   '^file://',
   '^https?://.*\.local',
+  # Documentation example domains are placeholders, not live dependencies.
   '^https?://example\.(com|org)',
 ]
 exclude_path = [
@@ -32,5 +35,6 @@ exclude_path = [
   "(^|/)\\.pytest_cache/",
   "(^|/)\\.cache/",
 ]
+# Private-network targets depend on the caller's environment and are not public links.
 exclude_all_private = true
 include_mail = false
