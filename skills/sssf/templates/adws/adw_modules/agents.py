@@ -11,15 +11,19 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
-from . import agent_pi, permissions, prompts
+from . import agent_copilot, permissions, prompts
 from .data_types import (
     AgentCall,
+    AgentCallbacks,
     AgentConfig,
+    AgentEvent,
+    AgentRequest,
+    AgentResult,
     EnvelopeBase,
     EventRecord,
     GateCheck,
@@ -27,8 +31,6 @@ from .data_types import (
     Phase,
     SSSFConfig,
     UsageBreakdown,
-    _PiRequest,
-    _PiResult,
 )
 from .utils import new_id
 
@@ -37,6 +39,16 @@ JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSO
 
 class GateFailure(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class _TraceAgent:
+    """The fields used by the trace session row's stable storage contract."""
+
+    name: str
+    coding_agent: str
+    model: str
+    color: str
 
 
 # ── config ───────────────────────────────────────────────────────────────────
@@ -83,18 +95,15 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
                            ("user", agent.prompt_engineering.user)):
             if not Path(ref).is_file():
                 problems.append(f"agent {name!r}: {label} prompt not found: {ref}")
-        try:
-            agent_pi.resolve_model(agent.model)
-        except ValueError as e:
-            problems.append(f"agent {name!r}: {e}")
     if problems:
         raise SystemExit("config validation failed:\n- " + "\n- ".join(problems))
+    agent_copilot.validate(cfg)
 
 
 # ── execution ────────────────────────────────────────────────────────────────
 
 def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
-    """One agent call: render prompts -> pi run -> typed parse -> gates -> envelope."""
+    """One agent call: render prompts -> Copilot -> typed parse -> gates -> envelope."""
     agent = resolve(run.cfg, phase.params.owner)
     agent_dir = run.session_dir / agent.name
     agent_dir.mkdir(parents=True, exist_ok=True)
@@ -115,52 +124,102 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                  payload={"model": agent.model,
                                           "reasoning_effort": agent.reasoning_effort,
                                           "context_tier": agent.context_tier,
-                                          "color": agent.color,
                                           "session_id": session_id,
+                                          "coding_agent": "copilot",
                                           "purpose": agent.purpose,
                                           "tools": agent.tools,  # None = all tools
                                           "skill_directories": agent.skill_directories,
                                           "plugin_directories": agent.plugin_directories,
-                                          "mcp_servers": agent.mcp_servers}))
+                                          "mcp_servers": sorted(agent.mcp_servers)}))
     run.console.agent_started(agent.name, agent.model, session_id)
 
-    # Parse retries and gate corrections re-enter the SAME pi session, so the
+    # Parse retries and gate corrections re-enter the SAME Copilot session, so the
     # last send is the one whose context occupancy is current — while spend is
     # the opposite: every send costs, so usage accumulates across all of them.
-    latest: _PiResult | None = None
+    latest: AgentResult | None = None
     spent = UsageBreakdown()
+    session_active = _is_active_copilot_session(run, agent)
 
-    def send(prompt_text: str) -> _PiResult:
-        nonlocal latest
-        request = _PiRequest(
+    # Every Copilot turn is checked before parsing or gating can decide to send
+    # another turn. A permission breach is terminal and supersedes a runtime
+    # failure because containment must not be bypassed by provoking an error.
+    tree_before = permissions.snapshot(run)
+
+    def enforce_writes(operation_error: BaseException | None = None) -> None:
+        try:
+            touched = permissions.enforce(run, phase, agent, tree_before)
+        except permissions.PermissionBreach as breach:
+            payload = {
+                "agent": agent.name,
+                "error": str(breach),
+                "writes": agent.writes,
+                "protected_files": run.cfg.defaults.protected_files,
+            }
+            if operation_error is not None:
+                payload["operation_error"] = str(operation_error)
+                payload["operation_error_type"] = type(operation_error).__name__
+            run.tracer.event(EventRecord(
+                adw_id=run.adw_id,
+                phase_id=phase.phase_id,
+                type="error",
+                name="permission_breach",
+                payload=payload,
+            ))
+            if operation_error is not None:
+                raise breach from operation_error
+            raise
+        if touched:
+            run.tracer.event(EventRecord(
+                adw_id=run.adw_id,
+                phase_id=phase.phase_id,
+                type="log",
+                name="paths_touched",
+                payload={"agent": agent.name, "paths": touched},
+            ))
+
+    def send(prompt_text: str) -> AgentResult:
+        nonlocal latest, session_active
+        request = AgentRequest(
             prompt=prompt_text,
             system_prompt=system_text,
             model=agent.model,
-            thinking=agent.reasoning_effort,
+            reasoning_effort=agent.reasoning_effort,
+            context_tier=agent.context_tier,
             session_id=session_id,
-            # absolute: these are read by the pi subprocess, which runs in repo_root
-            session_dir=str((agent_dir / "pi_sessions").resolve()),
+            resume=session_active,
+            runtime_dir=str((agent_dir / "copilot").resolve()),
             raw_output_path=str((agent_dir / "raw_output.jsonl").resolve()),
             tools=agent.tools,
-            extensions=agent.plugin_directories,
+            skill_directories=agent.skill_directories,
+            plugin_directories=agent.plugin_directories,
+            mcp_servers=agent.mcp_servers,
+            timeout_seconds=agent.timeouts.phase_seconds,
             cwd=str(run.repo_root),
         )
-        result = agent_pi.run(
-            request,
-            on_event=_event_forwarder(run, phase, agent.name),
-            on_spawn=lambda pid: run.tracer.process_start(
-                run.adw_id, "agent", agent.name, pid,
-                f"pi {agent.name} {agent.model}"),
-            on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid))
-        run.add_usage(result.tokens, result.cost)
-        spent.merge(result.usage)
-        latest = result
+        operation_error: BaseException | None = None
+        try:
+            result = agent_copilot.run(
+                request,
+                AgentCallbacks(on_event=_event_forwarder(run, phase, agent.name)),
+            )
+        except BaseException as error:
+            run.tracer.event(EventRecord(
+                adw_id=run.adw_id,
+                phase_id=phase.phase_id,
+                type="error",
+                name=agent.name,
+                payload={"agent": agent.name, "error": str(error)},
+            ))
+            operation_error = error
+            raise
+        else:
+            session_active = True
+            run.add_usage(result.usage.total_tokens, result.usage.total_cost)
+            spent.merge(result.usage)
+            latest = result
+        finally:
+            enforce_writes(operation_error)
         return result
-
-    # What the tree looked like before this agent got its hands on it. Every
-    # send in this phase — first prompt, JSON retries, gate corrections — is
-    # measured against this one baseline.
-    tree_before = permissions.snapshot(run)
 
     result = send(user_text)
     envelope, attempt = _parse_with_retries(run, phase, call, result, send)
@@ -193,31 +252,25 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
         result = send(correction)
         envelope, attempt = _parse_with_retries(run, phase, call, result, send)
 
-    # Permission is checked after every send is done, and before the envelope is
-    # accepted: an agent does not get to report success on a phase in which it
-    # wrote somewhere it was not allowed to.
-    try:
-        touched = permissions.enforce(run, phase, agent, tree_before)
-    except permissions.PermissionBreach as breach:
-        run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
-                                     type="error", name="permission_breach",
-                                     payload={"agent": agent.name, "error": str(breach),
-                                              "writes": agent.writes,
-                                              "protected_files": run.cfg.defaults.protected_files}))
-        raise
-    if touched:
-        run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
-                                     type="log", name="paths_touched",
-                                     payload={"agent": agent.name, "paths": touched}))
-
     _persist_envelope(run, phase, agent.name, call, envelope, attempt, valid=True)
     run.console.envelope_summary(envelope)
     context = latest or result
-    run.tracer.agent_session_row(run.adw_id, agent, session_id,
-                                 context_tokens=context.context_tokens,
-                                 context_window=context.context_window)
+    trace_agent = _TraceAgent(
+        name=agent.name,
+        coding_agent="copilot",
+        model=agent.model,
+        color=agent.color,
+    )
+    run.tracer.agent_session_row(
+        run.adw_id,
+        trace_agent,
+        session_id,
+        context_tokens=context.context_tokens,
+        context_window=context.context_window,
+        runtime=context.runtime,
+    )
     run.save_agent_map(agent.name, {"session_id": session_id, "model": agent.model,
-                                    "runtime": "pi"})
+                                    "runtime": "copilot"})
     run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
                                  type="handoff", name=agent.name,
                                  payload={"artifacts": envelope.artifacts,
@@ -230,7 +283,25 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                  payload={"cost": spent.total_cost,
                                           "usage": spent.model_dump(),
                                           "context_tokens": context.context_tokens,
-                                          "context_window": context.context_window}))
+                                          "context_window": context.context_window,
+                                          "sdk_version": (
+                                              context.runtime.sdk_version
+                                              if context.runtime
+                                              else ""
+                                          ),
+                                          "runtime_version": (
+                                              context.runtime.runtime_version
+                                              if context.runtime
+                                              else ""
+                                          ),
+                                          "protocol_version": (
+                                              context.runtime.protocol_version
+                                              if context.runtime
+                                              else ""
+                                          ),
+                                          "cli_version": (
+                                              context.runtime.cli_version if context.runtime else ""
+                                          )}))
     run.console.agent_finished(agent.name, spent.total_tokens, spent.total_cost)
     if envelope.status != "success":
         raise RuntimeError(f"{agent.name} reported status={envelope.status!r}: {envelope.summary}")
@@ -248,26 +319,31 @@ def _as_report(result) -> GateReport:
 
 def _agent_session_id(run, agent: AgentConfig) -> str:
     entry = run.agent_map.get(agent.name)
-    if entry and entry.get("model") == agent.model:
+    if entry and entry.get("model") == agent.model and entry.get("runtime") == "copilot":
         return entry["session_id"]           # rejoin the existing context window
     return f"sssf-{run.adw_id}-{agent.name}-{new_id(4)}"
 
 
-def _event_forwarder(run, phase: Phase, agent_name: str):
-    """One tool_call event per real tool call, with its exact args and result."""
-    tracker = agent_pi.ToolCallTracker()
+def _is_active_copilot_session(run, agent: AgentConfig) -> bool:
+    entry = run.agent_map.get(agent.name)
+    return bool(
+        entry
+        and entry.get("session_id")
+        and entry.get("model") == agent.model
+        and entry.get("runtime") == "copilot"
+    )
 
-    def forward(event: dict) -> None:
-        record = tracker.observe(event)
-        if record is None:
-            return
-        # The call's span rides the columns; duration_ms stays in the payload as
-        # pi's own authoritative number.
+
+def _event_forwarder(run, phase: Phase, agent_name: str):
+    """Write normalized Copilot event records to the ADW trace."""
+
+    def forward(event: AgentEvent) -> None:
+        payload = dict(event.payload)
         run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
-                                     type="tool_call", name=record.pop("label"),
-                                     started_at=record.pop("started_at", None),
-                                     ended_at=record.pop("ended_at", None),
-                                     payload={**record, "agent": agent_name}))
+                                     type=event.type, name=str(payload.pop("label", event.type)),
+                                     started_at=event.started_at,
+                                     ended_at=event.ended_at,
+                                     payload={**payload, "agent": agent_name}))
     return forward
 
 
@@ -286,8 +362,8 @@ def _extract_json(text: str) -> dict:
 
 
 def _parse_with_retries(
-    run, phase: Phase, call: AgentCall, result: _PiResult,
-    send: Callable[[str], _PiResult],
+    run, phase: Phase, call: AgentCall, result: AgentResult,
+    send: Callable[[str], AgentResult],
 ) -> tuple[EnvelopeBase, int]:
     """Parse the final response against the declared output type; on failure,
     continue the SAME session with a correction (bounded)."""
@@ -313,9 +389,13 @@ def _parse_with_retries(
 
 
 def _persist_envelope(run, phase: Phase, agent_name: str, call: AgentCall,
-                      envelope: Optional[EnvelopeBase], attempt: int,
+                      envelope: EnvelopeBase | None, attempt: int,
                       valid: bool, raw: str = "") -> None:
-    payload_json = envelope.model_dump_json(indent=2) if envelope else json.dumps({"raw": raw[-2000:]})
+    payload_json = (
+        envelope.model_dump_json(indent=2)
+        if envelope
+        else json.dumps({"raw": raw[-2000:]})
+    )
     run.tracer.envelope_row(phase, agent_name, call.output_type.__name__,
                             payload_json, valid, attempt)
     if envelope:
