@@ -16,7 +16,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional
 
-from .data_types import PiRequest, PiResult
+from .data_types import _PiRequest as PiRequest
+from .data_types import _PiResult as PiResult
 from .utils import now_iso, operator_env
 
 PI_PATH = os.environ.get("PI_PATH", "pi")
