@@ -1,7 +1,10 @@
 ---
 name: sssf
-description: Super Simple Software Factory — deploy and operate repeatable agents+code workflows (ADWs) in any codebase. Use when the user says /sssf install, wants to create/run/update an ADW, manage the agent roster in sssf.config.yaml, or observe running agent workflows. Keywords - sssf, software factory, ADW, AI developer workflow, agent pipeline, install factory.
-argument-hint: "[install | create adw | run adw | update config | ...]"
+description: Install and operate SSSF when creating, running, updating, or observing deterministic AI developer workflows and their agent roster.
+compatibility: Requires Python 3.11+, uv, git, sqlite3, and GitHub Copilot authentication. Bun is optional for the visualizer.
+metadata:
+  author: bossjones
+  version: "1.0.0"
 ---
 
 # Super Simple Software Factory (SSSF)
