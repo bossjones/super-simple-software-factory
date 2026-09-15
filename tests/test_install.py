@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -230,15 +231,24 @@ def test_adw_entry_points_pin_copilot_sdk(repo_root: Path):
 def test_generated_justfile_doctor_runs_in_fresh_install(repo_root: Path, tmp_path: Path):
     _init_target_repo(tmp_path)
     subprocess.run(_install_command(repo_root), cwd=tmp_path, check=True)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    copilot = bin_dir / "copilot"
+    copilot.write_text("#!/bin/sh\necho 'GitHub Copilot CLI test-version'\n")
+    copilot.chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
 
     result = subprocess.run(
         ["just", "copilot-doctor"],
         cwd=tmp_path,
+        env=env,
         text=True,
         capture_output=True,
         check=True,
     )
 
+    assert "GitHub Copilot CLI test-version" in result.stdout
     assert "1.0.13" in result.stdout
     assert "Runtime cached at:" in result.stdout or "already cached" in result.stdout
     assert "obs:" not in (tmp_path / "justfile").read_text()
