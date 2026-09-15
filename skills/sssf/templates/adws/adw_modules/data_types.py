@@ -503,39 +503,3 @@ class AgentResult(BaseModel):
     context_tokens: int = 0
     context_window: int = 0
     runtime: Optional[RuntimeInfo] = None
-
-
-# Transitional adapter types keep the Pi execution backend importable until
-# the Copilot runner replaces it. They are intentionally private contracts;
-# new code should use AgentRequest and AgentResult.
-class _PiRequest(BaseModel):
-    prompt: str
-    system_prompt: str
-    model: str
-    thinking: str = "medium"
-    session_id: str
-    session_dir: str
-    raw_output_path: str
-    tools: Optional[list[str]] = None
-    extensions: list[str] = Field(default_factory=list)
-    cwd: str = "."
-
-
-class _PiResult(BaseModel):
-    text: str = ""
-    returncode: int = 0
-    session_id: str = ""
-    tokens: int = 0
-    cost: float = 0.0
-    usage: UsageBreakdown = Field(default_factory=UsageBreakdown)
-    context_tokens: int = 0
-    context_window: int = 0
-
-
-def __getattr__(name: str):
-    """Resolve legacy Pi adapter types without making them data contracts."""
-    if name == "PiRequest":
-        return _PiRequest
-    if name == "PiResult":
-        return _PiResult
-    raise AttributeError(name)

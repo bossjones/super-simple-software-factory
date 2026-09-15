@@ -1,6 +1,12 @@
 #!/usr/bin/env -S uv run
 # /// script
-# dependencies = ["pydantic", "python-dotenv", "pyyaml", "rich"]
+# dependencies = [
+#   "github-copilot-sdk==1.0.13",
+#   "pydantic",
+#   "python-dotenv",
+#   "pyyaml",
+#   "rich",
+# ]
 # ///
 """ADW Document — write up the work that was just done, from the diff.
 
