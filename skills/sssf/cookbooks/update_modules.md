@@ -2,15 +2,16 @@
 
 Low-level logic belongs in `adws/adw_modules/`; ADW scripts only sequence
 phases and decide acceptance. The Copilot adapter owns SDK startup, runtime
-preflight, create/resume, event subscription, permissions, idle completion,
-abort, cleanup, and runtime metadata.
+preflight, create/resume, event subscription, capability permission handling,
+idle completion, abort, cleanup, and runtime metadata. The orchestrator owns
+the authoritative post-send repository write-policy check.
 
 Keep the host-side contract:
 
 - typed `AgentRequest`, `AgentCallbacks`, `AgentEvent`, and `AgentResult`;
 - Pydantic envelope parsing and bounded same-session corrections;
 - changed-path snapshot and rollback enforcement;
-- normalized events plus raw JSONL retention;
+- centrally sanitized normalized events plus raw JSONL retention;
 - SDK/runtime/CLI version metadata.
 
 Run focused tests and lint after a change:

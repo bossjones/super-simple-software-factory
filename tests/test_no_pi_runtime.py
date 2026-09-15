@@ -1,4 +1,6 @@
+import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 FORBIDDEN = (
     "agent_pi",
@@ -9,6 +11,15 @@ FORBIDDEN = (
     "coding_agent: pi",
     "pi --mode",
 )
+
+STALE_CURRENT_DOC_REFERENCES = (
+    "../.claude/",
+    ".claude/skills/sssf",
+    "agent_pi",
+    "harness_engineering",
+    "coding_agent: pi",
+)
+MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
 
 def test_production_runtime_has_no_pi_coupling(repo_root: Path):
@@ -31,3 +42,31 @@ def test_production_runtime_has_no_pi_coupling(repo_root: Path):
                 if needle in text:
                     offenders.append(f"{path.relative_to(repo_root)}: {needle}")
     assert offenders == []
+
+
+def test_current_ai_docs_do_not_reference_removed_sssf_surfaces(repo_root: Path):
+    offenders = []
+    for path in sorted((repo_root / "ai_docs").glob("*.md")):
+        text = path.read_text()
+        if "historical: true" in text:
+            continue
+        for needle in STALE_CURRENT_DOC_REFERENCES:
+            if needle in text:
+                offenders.append(f"{path.relative_to(repo_root)}: {needle}")
+    assert offenders == []
+
+
+def test_current_ai_docs_local_links_resolve(repo_root: Path):
+    missing = []
+    for path in sorted((repo_root / "ai_docs").glob("*.md")):
+        text = path.read_text()
+        if "historical: true" in text:
+            continue
+        for target in MARKDOWN_LINK.findall(text):
+            parsed = urlparse(target)
+            if parsed.scheme or target.startswith("#"):
+                continue
+            resolved = (path.parent / parsed.path).resolve()
+            if not resolved.exists():
+                missing.append(f"{path.relative_to(repo_root)} -> {target}")
+    assert missing == []

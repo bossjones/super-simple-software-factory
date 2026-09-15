@@ -47,9 +47,10 @@ installing it:
 copilot --no-auto-update --plugin-dir /path/to/super-simple-software-factory plugin list --json
 ```
 
-The installer creates `adws/`, `.env.sample`, `justfile`, prompt/runtime
-templates, and ignored session/trace directories. It skips existing files.
-Use `--force` only after backing up local configuration; it overwrites stamped
+The installer creates `adws/`, `.env.sample`, `justfile`, and prompt/runtime
+templates, and adds the target-repository ignore rules. Session and trace
+directories are created on the first ADW run. Existing files are skipped. Use
+`--force` only after backing up local configuration; it overwrites stamped
 files.
 
 ## Preflight

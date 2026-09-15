@@ -12,6 +12,7 @@ import sqlite3
 from pathlib import Path
 
 from .data_types import AgentConfig, EventRecord, GateReport, Phase, RuntimeInfo
+from .redaction import redact_text, sanitize_for_persistence
 from .utils import ensure_dir, new_id, now_iso
 
 SCHEMA = """
@@ -95,16 +96,18 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
 
 # Columns added after a schema shipped. CREATE TABLE IF NOT EXISTS never
 # revisits an existing table, so additive changes need an explicit ALTER.
-MIGRATIONS = [("agent_sessions", "color", "TEXT"),
-              ("gate_results", "checks_json", "TEXT"),
-              ("sessions", "adw_name", "TEXT"),
-              ("agent_sessions", "context_tokens", "INTEGER"),
-              ("agent_sessions", "context_window", "INTEGER"),
-              ("agent_sessions", "sdk_version", "TEXT"),
-              ("agent_sessions", "runtime_version", "TEXT"),
-              ("agent_sessions", "protocol_version", "TEXT"),
-              ("agent_sessions", "cli_version", "TEXT"),
-              ("sessions", "archived", "INTEGER DEFAULT 0")]
+MIGRATIONS = [
+    ("agent_sessions", "color", "TEXT"),
+    ("gate_results", "checks_json", "TEXT"),
+    ("sessions", "adw_name", "TEXT"),
+    ("agent_sessions", "context_tokens", "INTEGER"),
+    ("agent_sessions", "context_window", "INTEGER"),
+    ("agent_sessions", "sdk_version", "TEXT"),
+    ("agent_sessions", "runtime_version", "TEXT"),
+    ("agent_sessions", "protocol_version", "TEXT"),
+    ("agent_sessions", "cli_version", "TEXT"),
+    ("sessions", "archived", "INTEGER DEFAULT 0"),
+]
 
 
 class Tracer:
@@ -131,15 +134,26 @@ class Tracer:
     def event(self, record: EventRecord) -> str:
         event_id = f"evt_{new_id(12)}"
         ts = now_iso()
-        line = {"event_id": event_id, "ts": ts, **record.model_dump()}
+        safe_payload = sanitize_for_persistence(record.payload)
+        safe_record = record.model_copy(update={"payload": safe_payload})
+        line = {"event_id": event_id, "ts": ts, **safe_record.model_dump()}
         with self.events_jsonl.open("a") as f:
             f.write(json.dumps(line) + "\n")
         self.conn.execute(
             "INSERT INTO events (event_id, adw_id, phase_id, parent_id, type, name,"
             " payload_json, tokens, started_at, ended_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (event_id, record.adw_id, record.phase_id, record.parent_id, record.type,
-             record.name, json.dumps(record.payload), record.tokens,
-             record.started_at or ts, record.ended_at),
+            (
+                event_id,
+                safe_record.adw_id,
+                safe_record.phase_id,
+                safe_record.parent_id,
+                safe_record.type,
+                safe_record.name,
+                json.dumps(safe_payload),
+                safe_record.tokens,
+                safe_record.started_at or ts,
+                safe_record.ended_at,
+            ),
         )
         return event_id
 
@@ -153,24 +167,28 @@ class Tracer:
         if not adw_name:
             return
         # A joined session chains ADWs — record each distinct one, in run order.
-        row = self.conn.execute("SELECT adw_name FROM sessions WHERE adw_id=?",
-                                (adw_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT adw_name FROM sessions WHERE adw_id=?", (adw_id,)
+        ).fetchone()
         names = row[0].split(" + ") if row and row[0] else []
         if adw_name not in names:
             names.append(adw_name)
-            self.conn.execute("UPDATE sessions SET adw_name=? WHERE adw_id=?",
-                              (" + ".join(names), adw_id))
+            self.conn.execute(
+                "UPDATE sessions SET adw_name=? WHERE adw_id=?", (" + ".join(names), adw_id)
+            )
 
     def session_request(self, adw_id: str, request: str) -> None:
-        self.conn.execute("UPDATE sessions SET request=? WHERE adw_id=?",
-                          (request[:500], adw_id))
+        self.conn.execute(
+            "UPDATE sessions SET request=? WHERE adw_id=?",
+            (redact_text(request)[:500], adw_id),
+        )
 
     def session_finish(self, adw_id: str, ok: bool) -> None:
         self.conn.execute(
             "UPDATE sessions SET status=?, ended_at=? WHERE adw_id=?",
             ("success" if ok else "fail", now_iso(), adw_id),
         )
-        self.processes_end_all(adw_id)   # nothing of this run is alive any more
+        self.processes_end_all(adw_id)  # nothing of this run is alive any more
 
     def session_add_usage(self, adw_id: str, tokens: int, cost: float) -> None:
         self.conn.execute(
@@ -179,8 +197,7 @@ class Tracer:
         )
 
     # ── processes (adw_id → pid, so a hung run can be found and killed) ─────
-    def process_start(self, adw_id: str, kind: str, name: str, pid: int,
-                      command: str) -> None:
+    def process_start(self, adw_id: str, kind: str, name: str, pid: int, command: str) -> None:
         """Record a live process for this run.
 
         A coding agent that hangs produces no events at all, which is exactly
@@ -191,7 +208,7 @@ class Tracer:
         self.conn.execute(
             "INSERT INTO processes (adw_id, kind, name, pid, command, started_at)"
             " VALUES (?,?,?,?,?,?)",
-            (adw_id, kind, name, pid, command[:500], now_iso()),
+            (adw_id, kind, name, pid, redact_text(command)[:500], now_iso()),
         )
 
     def process_end(self, adw_id: str, pid: int) -> None:
@@ -219,8 +236,9 @@ class Tracer:
         ordering) and `phase_id` (silently overwriting a row through the
         phase_upsert conflict clause).
         """
-        row = self.conn.execute("SELECT MAX(seq) FROM phases WHERE adw_id = ?",
-                                (adw_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT MAX(seq) FROM phases WHERE adw_id = ?", (adw_id,)
+        ).fetchone()
         return row[0] if row and row[0] is not None else 0
 
     def phase_upsert(self, phase: Phase) -> None:
@@ -231,19 +249,51 @@ class Tracer:
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(phase_id) DO UPDATE SET status=excluded.status,"
             " attempt=excluded.attempt, error=excluded.error, ended_at=excluded.ended_at",
-            (phase.phase_id, phase.adw_id, phase.seq, p.name, p.kind, p.owner,
-             p.description, phase.status, phase.attempt, p.retries, phase.error,
-             phase.started_at, phase.ended_at),
+            (
+                phase.phase_id,
+                phase.adw_id,
+                phase.seq,
+                p.name,
+                p.kind,
+                p.owner,
+                p.description,
+                phase.status,
+                phase.attempt,
+                p.retries,
+                redact_text(phase.error) if phase.error else None,
+                phase.started_at,
+                phase.ended_at,
+            ),
         )
 
     # ── envelopes / gates / agent sessions ──────────────────────────────────
-    def envelope_row(self, phase: Phase, agent: str, output_type: str,
-                     payload_json: str, valid: bool, attempt: int) -> None:
+    def envelope_row(
+        self,
+        phase: Phase,
+        agent: str,
+        output_type: str,
+        payload_json: str,
+        valid: bool,
+        attempt: int,
+    ) -> None:
+        try:
+            safe_payload_json = json.dumps(sanitize_for_persistence(json.loads(payload_json)))
+        except json.JSONDecodeError:
+            safe_payload_json = redact_text(payload_json)
         self.conn.execute(
             "INSERT INTO envelopes (envelope_id, adw_id, phase_id, agent, output_type,"
             " payload_json, valid, attempt, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-            (f"env_{new_id(12)}", phase.adw_id, phase.phase_id, agent, output_type,
-             payload_json, int(valid), attempt, now_iso()),
+            (
+                f"env_{new_id(12)}",
+                phase.adw_id,
+                phase.phase_id,
+                agent,
+                output_type,
+                safe_payload_json,
+                int(valid),
+                attempt,
+                now_iso(),
+            ),
         )
 
     def gate_row(self, phase: Phase, gate: str, report: GateReport, attempt: int) -> None:
@@ -251,14 +301,27 @@ class Tracer:
         self.conn.execute(
             "INSERT INTO gate_results (adw_id, phase_id, attempt, gate, passed,"
             " violations_json, checks_json, created_at) VALUES (?,?,?,?,?,?,?,?)",
-            (phase.adw_id, phase.phase_id, attempt, gate, int(report.passed),
-             json.dumps(report.violations),
-             json.dumps([c.model_dump() for c in report.checks]), now_iso()),
+            (
+                phase.adw_id,
+                phase.phase_id,
+                attempt,
+                gate,
+                int(report.passed),
+                json.dumps(sanitize_for_persistence(report.violations)),
+                json.dumps(sanitize_for_persistence([c.model_dump() for c in report.checks])),
+                now_iso(),
+            ),
         )
 
-    def agent_session_row(self, adw_id: str, agent: AgentConfig, session_id: str,
-                          context_tokens: int = 0, context_window: int = 0,
-                          runtime: RuntimeInfo | None = None) -> None:
+    def agent_session_row(
+        self,
+        adw_id: str,
+        agent: AgentConfig,
+        session_id: str,
+        context_tokens: int = 0,
+        context_window: int = 0,
+        runtime: RuntimeInfo | None = None,
+    ) -> None:
         """The agent's config row is the source of truth for its label and color.
 
         Context is carried here rather than derived from events because the lane
@@ -267,17 +330,22 @@ class Tracer:
         """
         ts = now_iso()
         runtime_values = (
-            runtime.sdk_version,
-            runtime.runtime_version,
-            runtime.protocol_version,
-            runtime.cli_version,
-        ) if runtime else (None, None, None, None)
+            (
+                runtime.sdk_version,
+                runtime.runtime_version,
+                runtime.protocol_version,
+                runtime.cli_version,
+            )
+            if runtime
+            else (None, None, None, None)
+        )
         self.conn.execute(
             "INSERT INTO agent_sessions (adw_id, agent, coding_agent, model, color,"
             " session_id, context_tokens, context_window, sdk_version, runtime_version,"
             " protocol_version, cli_version, created_at, last_used_at)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
-            " ON CONFLICT(adw_id, agent) DO UPDATE SET model=excluded.model,"
+            " ON CONFLICT(adw_id, agent) DO UPDATE SET coding_agent=excluded.coding_agent,"
+            " model=excluded.model,"
             " color=excluded.color, session_id=excluded.session_id,"
             " context_tokens=excluded.context_tokens,"
             " context_window=excluded.context_window,"
@@ -286,6 +354,17 @@ class Tracer:
             " protocol_version=excluded.protocol_version,"
             " cli_version=excluded.cli_version,"
             " last_used_at=excluded.last_used_at",
-            (adw_id, agent.name, "copilot", agent.model, agent.color,
-             session_id, context_tokens, context_window, *runtime_values, ts, ts),
+            (
+                adw_id,
+                agent.name,
+                "copilot",
+                agent.model,
+                agent.color,
+                session_id,
+                context_tokens,
+                context_window,
+                *runtime_values,
+                ts,
+                ts,
+            ),
         )

@@ -75,17 +75,20 @@ Copy templates from a separately located SSSF checkout; plugin installation
 alone does not provide these files:
 
 ```bash
+SSSF_ROOT="$HOME/src/super-simple-software-factory"
 mkdir -p adws/adw_data adws/adw_sssf_config
-cp -R skills/sssf/templates/adws/. adws/
-cp -R skills/sssf/templates/prompt_engineering adws/adw_data/
-cp skills/sssf/templates/sssf.config.yaml adws/adw_sssf_config/sssf.config.yaml
-cp skills/sssf/templates/env.sample .env.sample
-cp skills/sssf/templates/justfile justfile
+cp -R "$SSSF_ROOT/skills/sssf/templates/adws/." adws/
+cp -R "$SSSF_ROOT/skills/sssf/templates/prompt_engineering" adws/adw_data/
+cp "$SSSF_ROOT/skills/sssf/templates/sssf.config.yaml" \
+  adws/adw_sssf_config/sssf.config.yaml
+cp "$SSSF_ROOT/skills/sssf/templates/env.sample" .env.sample
+cp "$SSSF_ROOT/skills/sssf/templates/justfile" justfile
 ```
 
 Copy only the files needed by the target repository and preserve local
-customizations. The installer is the preferred path because it also creates
-runtime directories and applies the target-repository ignore rules.
+customizations. The installer is the preferred path because it also adds the
+target-repository ignore rules. Session and trace directories are created on
+the first ADW run.
 
 ### Local plugin development
 
@@ -172,7 +175,7 @@ defaults:
   model: gpt-5.4
   reasoning_effort: medium
   context_tier: default
-  tools: null
+  tools: [view, rg, glob, bash, apply_patch]
   skill_directories: []
   plugin_directories: []
   mcp_servers: {}
@@ -187,7 +190,9 @@ defaults:
 Agent entries inherit defaults and may override model, reasoning effort,
 context tier, tools, skill/plugin directories, MCP servers, `writes`, and
 timeouts. Models are unqualified Copilot model IDs such as `gpt-5.4`.
-`writes` is the repository boundary; `tools` is only a capability list.
+`tools` must be an explicit non-empty Copilot allowlist because the adapter
+uses SDK empty mode; there is no implicit "all tools" value. `writes` is the
+authoritative repository boundary, while `tools` narrows capabilities.
 `protected_files` remains off limits unless explicitly unlocked for that
 agent. Only `phase_seconds` is currently enforced as a timeout.
 `tool_seconds` and `correction_seconds` are reserved fields, not independent
@@ -264,17 +269,26 @@ not a supported second runtime.
 Credential-free checks:
 
 ```bash
-uv run pytest -q
-uv run ruff check skills/sssf/templates/adws/adw_modules
-just docs-check
+just verify
 ```
 
-Plugin and schema checks:
+This runs the Ruff format check and lint, Pyright, pytest, plugin schema
+validation, Markdown link validation, and the visualizer build.
+
+With Copilot authentication and entitlement available, also run the opt-in
+runtime smoke:
 
 ```bash
-uv run check-jsonschema \
-  --schemafile https://agent-plugins.org/schemas/1.0.0/plugin.schema.json \
-  plugin.json
+just copilot-smoke
+```
+
+The live smoke covers authenticated SDK create/disconnect, a read-only turn,
+event capture, and a same-session resumed correction. Deterministic tests, not
+model behavior, verify allowed writes and unauthorized-write rollback.
+
+Local plugin discovery:
+
+```bash
 copilot --no-auto-update --plugin-dir . plugin list --json
 ```
 

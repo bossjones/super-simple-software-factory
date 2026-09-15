@@ -13,7 +13,7 @@ defaults:
   model: gpt-5.4
   reasoning_effort: medium
   context_tier: default
-  tools: null
+  tools: [view, rg, glob, bash, apply_patch]
   skill_directories: []
   plugin_directories: []
   mcp_servers: {}

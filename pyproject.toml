@@ -26,10 +26,15 @@ asyncio_mode = "auto"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+include = ["*.py", "*.pyi"]
+exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
 
 [tool.pyright]
 pythonVersion = "3.11"
 include = ["skills/sssf/templates/adws/adw_modules", "scripts", "tests"]
+exclude = ["tests/fixtures"]
+extraPaths = ["skills/sssf/templates/adws"]

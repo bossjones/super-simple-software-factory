@@ -25,27 +25,61 @@ from adw_modules.data_types import AgentCall, BuildOutput, PhaseParams, PlanOutp
 REQUIRED_AGENTS = ["planner", "builder"]
 
 
-def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None) -> int:
+def main(
+    prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None
+) -> int:
     cfg = agents.load_config(config)
     agents.validate(cfg, REQUIRED_AGENTS)
     run = session.ensure(cfg, adw_id)
 
-    with run.phase(PhaseParams(name="request", kind="engineer", owner=run.engineer,
-                               description="Capture the incoming ask")) as ph:
+    with run.phase(
+        PhaseParams(
+            name="request",
+            kind="engineer",
+            owner=run.engineer,
+            description="Capture the incoming ask",
+        )
+    ) as ph:
         ph.log(input=prompt)
 
-    with run.phase(PhaseParams(name="plan", kind="agent", owner="planner",
-                               description="Turn the request into an implementable plan")) as ph:
-        plan = ph.call(AgentCall(output_type=PlanOutput, prompt=prompt,
-                                 gates=[gates.artifacts_exist, gates.files_non_empty]))
+    with run.phase(
+        PhaseParams(
+            name="plan",
+            kind="agent",
+            owner="planner",
+            description="Turn the request into an implementable plan",
+        )
+    ) as ph:
+        plan = ph.call(
+            AgentCall(
+                output_type=PlanOutput,
+                prompt=prompt,
+                gates=[gates.artifacts_exist, gates.files_non_empty],
+            )
+        )
 
-    with run.phase(PhaseParams(name="build", kind="agent", owner="builder",
-                               description="Implement the plan exactly")) as ph:
-        build = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt, previous=plan,
-                                  gates=[gates.diff_matches_claims]))
+    with run.phase(
+        PhaseParams(
+            name="build", kind="agent", owner="builder", description="Implement the plan exactly"
+        )
+    ) as ph:
+        build = ph.call(
+            AgentCall(
+                output_type=BuildOutput,
+                prompt=prompt,
+                previous=plan,
+                gates=[gates.diff_matches_claims],
+            )
+        )
 
-    with run.phase(PhaseParams(name="commit", kind="code", owner="git",
-                               description="Land the builder's changes, using the message it wrote")) as ph:
+    with run.phase(
+        PhaseParams(
+            name="commit",
+            kind="code",
+            owner="git",
+            description="Land the builder's changes, using the message it wrote",
+        )
+    ) as ph:
         message = build.commit_message or f"sssf({run.adw_id}): {build.summary}"
         ph.log(sha=git_helper.commit_all(message), message=message)
 

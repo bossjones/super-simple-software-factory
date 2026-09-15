@@ -25,19 +25,32 @@ from adw_modules.data_types import AgentCall, PhaseParams, ScoutOutput
 REQUIRED_AGENTS = ["scout"]
 
 
-def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None) -> int:
+def main(
+    prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None
+) -> int:
     cfg = agents.load_config(config)
     agents.validate(cfg, REQUIRED_AGENTS)
     run = session.ensure(cfg, adw_id)
 
-    with run.phase(PhaseParams(name="request", kind="engineer", owner=run.engineer,
-                               description="Capture the incoming ask")) as ph:
+    with run.phase(
+        PhaseParams(
+            name="request",
+            kind="engineer",
+            owner=run.engineer,
+            description="Capture the incoming ask",
+        )
+    ) as ph:
         ph.log(input=prompt)
 
-    with run.phase(PhaseParams(name="scout", kind="agent", owner="scout",
-                               description="Find and report where things live — change nothing")) as ph:
-        ph.call(AgentCall(output_type=ScoutOutput, prompt=prompt,
-                          gates=[gates.artifacts_exist]))
+    with run.phase(
+        PhaseParams(
+            name="scout",
+            kind="agent",
+            owner="scout",
+            description="Find and report where things live — change nothing",
+        )
+    ) as ph:
+        ph.call(AgentCall(output_type=ScoutOutput, prompt=prompt, gates=[gates.artifacts_exist]))
 
     return run.finish()
 

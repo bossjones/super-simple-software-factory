@@ -1,7 +1,8 @@
 # Pi Capability Baseline
 
 verified_on: 2026-09-14
-scope: This page records the Pi features SSSF v1 depends on today and does not decide how each feature should be ported.
+historical: true
+scope: This historical page records the Pi features the pre-Copilot SSSF v1 depended on and does not describe the supported runtime.
 
 - Pi is a minimal terminal coding harness that stays small at the core and extends itself through TypeScript extensions, skills, prompt templates, themes, and packages; source: [Pi documentation index](https://pi.dev/docs/latest) and the [Pi repository](https://github.com/earendil-works/pi).
 - Pi exposes the exact non-interactive surfaces SSSF v1 leans on: print mode (`-p/--print`), JSON event stream mode (`--mode json`), and RPC mode (`--mode rpc`); source: [Using Pi](https://pi.dev/docs/latest/usage), [JSON Event Stream Mode](https://pi.dev/docs/latest/json), and [RPC Mode](https://pi.dev/docs/latest/rpc).

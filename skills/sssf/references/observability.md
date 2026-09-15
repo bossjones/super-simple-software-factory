@@ -6,10 +6,13 @@ The trace path is:
 Copilot session events -> normalized SSSF events -> JSONL + SQLite -> UI
 ```
 
-Raw Copilot event JSON is retained in each session's `raw_output.jsonl` for
-diagnosis. SQLite stores normalized events and excludes raw reasoning content
-and secrets. Persisted completion events can be replayed; ephemeral deltas and
-idle notifications are live telemetry.
+Sanitized raw Copilot event JSON is retained in each session's
+`raw_output.jsonl` for diagnosis. Before persistence, SSSF recursively redacts
+credential-shaped fields, configured token values, and secret-shaped strings
+while retaining event types, tool names, paths, statuses, and other useful
+evidence. SQLite stores normalized events behind the same sanitizer and
+excludes raw reasoning content. Persisted completion events can be replayed;
+ephemeral deltas and idle notifications are live telemetry.
 
 ## Normalized events
 

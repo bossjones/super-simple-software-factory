@@ -12,7 +12,7 @@ defaults:
   reasoning_effort: medium
   context_tier: default
   color: ""
-  tools: null
+  tools: [view, rg, glob, bash, apply_patch]
   skill_directories: []
   plugin_directories: []
   mcp_servers: {}
@@ -32,17 +32,25 @@ observability:
 
 `model` is an unqualified Copilot model ID. `reasoning_effort` is one of
 `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
-`context_tier` is `default` or `long_context`. `tools: null` means the SDK
-may use its available tools; a list narrows the capability surface.
+`context_tier` is `default` or `long_context`. `tools` must be an explicit,
+non-empty SDK allowlist because SSSF uses `mode="empty"`; `null` and `[]` are
+rejected rather than interpreted as "all tools."
 
 `skill_directories` and `plugin_directories` add Copilot discovery roots.
-`mcp_servers` is passed to the SDK as configured. Validate every server and
-its permissions before enabling it.
+When `skill_directories` is non-empty, SSSF explicitly enables SDK skill
+loading. Explicit plugin directories are passed on both create and resume.
+`mcp_servers` is passed to the SDK as configured. Validate every server and its
+permissions before enabling it.
 
 `writes` is the repository write policy: omitted/`null` is unrestricted except
 for protected files, `[]` is read-only with respect to the repository, and a
 list uses exact paths plus `/`, `*`, and `**` patterns. `protected_files`
 cannot be changed unless the agent explicitly names the path in `writes`.
+The SDK receives `tools` as `available_tools`. The callback returns no result
+for managed-approval requests and approves ordinary permission requests once.
+The tool list narrows capabilities, but the callback is not path-aware. SSSF
+enforces `writes` after every turn by comparing and, where possible, rolling
+back changed paths.
 
 `phase_seconds` is the only timeout currently enforced: it bounds the phase,
 and the runtime calls `session.abort()` when the deadline expires. If present,

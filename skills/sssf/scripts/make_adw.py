@@ -16,9 +16,13 @@ import argparse
 import sys
 from pathlib import Path
 
-OUTPUT_TYPES = {"planner": "PlanOutput", "builder": "BuildOutput",
-                "scout": "ScoutOutput",
-                "reviewer": "ReviewOutput", "documenter": "DocumentOutput"}
+OUTPUT_TYPES = {
+    "planner": "PlanOutput",
+    "builder": "BuildOutput",
+    "scout": "ScoutOutput",
+    "reviewer": "ReviewOutput",
+    "documenter": "DocumentOutput",
+}
 
 HEADER = '''#!/usr/bin/env -S uv run
 # /// script
@@ -64,13 +68,13 @@ if __name__ == "__main__":
     sys.exit(main(utils.resolve_prompt(args.prompt), args.config, args.adw_id))
 '''
 
-PHASE = '''    # TODO: replace this description — say what THIS phase does and why.
+PHASE = """    # TODO: replace this description — say what THIS phase does and why.
     with run.phase(PhaseParams(name="{name}", kind="agent", owner="{agent}",
                                description="Run {agent} over the request and hand its envelope on")) as ph:
         previous = ph.call(AgentCall(output_type={output_type}, prompt=prompt,
                                      previous=previous,
                                      gates=[gates.artifacts_exist]))
-'''
+"""
 
 
 def main() -> int:
@@ -88,7 +92,7 @@ def main() -> int:
     types = [OUTPUT_TYPES.get(a, "GenericOutput") for a in agent_names]
     seen: dict[str, int] = {}
     phases = []
-    for agent, output_type in zip(agent_names, types):
+    for agent, output_type in zip(agent_names, types, strict=True):
         seen[agent] = seen.get(agent, 0) + 1
         phase_name = agent if seen[agent] == 1 else f"{agent}_{seen[agent]}"
         phases.append(PHASE.format(name=phase_name, agent=agent, output_type=output_type))
@@ -109,9 +113,11 @@ def main() -> int:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(body)
     print(f"wrote {dest}")
-    print("next: replace each phase description — a generated one says nothing, "
-          "and the description is the only intent the trace ever shows")
-    print(f"run: uv run adws/adw_{args.name}.py \"your request\"")
+    print(
+        "next: replace each phase description — a generated one says nothing, "
+        "and the description is the only intent the trace ever shows"
+    )
+    print(f'run: uv run adws/adw_{args.name}.py "your request"')
     return 0
 
 

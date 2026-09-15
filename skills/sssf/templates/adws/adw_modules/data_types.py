@@ -9,7 +9,8 @@ that its final JSON response is parsed against. No untyped handoffs.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Literal, Optional, Type
+from collections.abc import Callable
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
@@ -19,14 +20,15 @@ PhaseStatus = Literal["queued", "running", "success", "fail"]
 
 # ── Phases ────────────────────────────────────────────────────────────────────
 
+
 class PhaseParams(BaseModel):
     """Everything run.phase() needs. Passed as one object, never loose params."""
 
-    name: str                       # short id, unique within the run: "plan", "build"
-    kind: PhaseKind                 # which lane the block renders in
-    owner: str                      # engineer's name, "git", or an agent name from config
-    description: str                # REQUIRED: what this phase does and why — see below
-    retries: int = 0                # agent phases: gate-failure retries via continue
+    name: str  # short id, unique within the run: "plan", "build"
+    kind: PhaseKind  # which lane the block renders in
+    owner: str  # engineer's name, "git", or an agent name from config
+    description: str  # REQUIRED: what this phase does and why — see below
+    retries: int = 0  # agent phases: gate-failure retries via continue
 
     @field_validator("description")
     @classmethod
@@ -45,11 +47,13 @@ class PhaseParams(BaseModel):
         if not text:
             raise ValueError(
                 f"phase {name!r}: description is required — one sentence on what this "
-                f"phase does and why. It is what the trace and the UI show.")
+                f"phase does and why. It is what the trace and the UI show."
+            )
         if text.rstrip(".").casefold() == name.replace("_", " ").casefold():
             raise ValueError(
                 f"phase {name!r}: description {text!r} only restates the phase name — "
-                f"say what it does and why instead.")
+                f"say what it does and why instead."
+            )
         return text
 
 
@@ -60,14 +64,15 @@ class Phase(BaseModel):
     adw_id: str
     seq: int
     params: PhaseParams
-    status: PhaseStatus = "fail"    # success must be earned
+    status: PhaseStatus = "fail"  # success must be earned
     attempt: int = 0
-    error: Optional[str] = None
-    started_at: Optional[str] = None
-    ended_at: Optional[str] = None
+    error: str | None = None
+    started_at: str | None = None
+    ended_at: str | None = None
 
 
 # ── Envelopes (agent output types) ───────────────────────────────────────────
+
 
 class EnvelopeBase(BaseModel):
     """Base of every agent's final JSON response. Output types extend this."""
@@ -92,7 +97,7 @@ class PlanOutput(EnvelopeBase):
 
 class BuildOutput(EnvelopeBase):
     changed_files: list[str] = Field(default_factory=list)
-    commit_message: str = ""        # consumed by the git commit phase
+    commit_message: str = ""  # consumed by the git commit phase
 
 
 class ScoutFinding(BaseModel):
@@ -107,9 +112,9 @@ class ScoutOutput(EnvelopeBase):
 class ReviewFinding(BaseModel):
     """One thing the request (or plan) asked for, and whether it is there."""
 
-    requirement: str                # the ask, in the requester's words
+    requirement: str  # the ask, in the requester's words
     met: bool
-    evidence: str = ""              # where it lives, or what is missing
+    evidence: str = ""  # where it lives, or what is missing
 
 
 class ReviewOutput(EnvelopeBase):
@@ -117,13 +122,13 @@ class ReviewOutput(EnvelopeBase):
 
     approved: bool = False
     findings: list[ReviewFinding] = Field(default_factory=list)
-    blocking: list[str] = Field(default_factory=list)   # what must change before approval
+    blocking: list[str] = Field(default_factory=list)  # what must change before approval
 
 
 class DocumentOutput(EnvelopeBase):
     """Where the write-up of a completed change landed."""
 
-    document_path: str = ""         # the doc in the repo, e.g. app_docs/<adw_id>_<slug>.md
+    document_path: str = ""  # the doc in the repo, e.g. app_docs/<adw_id>_<slug>.md
     documented_files: list[str] = Field(default_factory=list)
     commit_message: str = ""
 
@@ -174,11 +179,12 @@ class QualityResult(BaseModel):
 
 # ── Change capture (git diff, deterministic) ─────────────────────────────────
 
+
 class ChangeCapture(BaseModel):
     """Everything documentation.capture() needs. One object, never loose params."""
 
-    base: str = "main"              # the ref the work is measured against
-    max_diff_lines: int = 2000      # the diff artifact is truncated past this
+    base: str = "main"  # the ref the work is measured against
+    max_diff_lines: int = 2000  # the diff artifact is truncated past this
     include_untracked: bool = True  # a brand-new file is part of the change
 
 
@@ -190,8 +196,8 @@ class BaseRef(BaseModel):
     leaving the reader to infer it.
     """
 
-    ref: str                        # what was asked for: "main", or a pinned sha
-    commit: str                     # the commit actually diffed against
+    ref: str  # what was asked for: "main", or a pinned sha
+    commit: str  # the commit actually diffed against
     reason: str = ""
 
     @property
@@ -210,8 +216,8 @@ class ChangeSet(BaseModel):
     untracked: list[str] = Field(default_factory=list)
     insertions: int = 0
     deletions: int = 0
-    stat: str = ""                  # `git diff --stat` output, verbatim
-    diff_path: str = ""             # the full diff, written into context_handoff/
+    stat: str = ""  # `git diff --stat` output, verbatim
+    diff_path: str = ""  # the full diff, written into context_handoff/
     truncated: bool = False
 
     @property
@@ -226,12 +232,12 @@ class ChangesOutput(EnvelopeBase):
     consumes it through the one door every agent handoff uses.
     """
 
-    base: str = ""                  # "<ref> @ <commit> — <reason>"
+    base: str = ""  # "<ref> @ <commit> — <reason>"
     changed_files: list[str] = Field(default_factory=list)
     insertions: int = 0
     deletions: int = 0
     stat: str = ""
-    diff_path: str = ""             # read this for the full diff
+    diff_path: str = ""  # read this for the full diff
 
 
 class VerifyOutput(EnvelopeBase):
@@ -249,6 +255,7 @@ class VerifyOutput(EnvelopeBase):
 
 # ── Agent calls ──────────────────────────────────────────────────────────────
 
+
 class GateCheck(BaseModel):
     """One thing a gate looked at, and what it found.
 
@@ -256,7 +263,7 @@ class GateCheck(BaseModel):
     failed check it doubles as the reason, so it is what the agent is told.
     """
 
-    item: str                       # what was checked: a path, a command, a test
+    item: str  # what was checked: a path, a command, a test
     ok: bool
     note: str = ""
 
@@ -270,7 +277,7 @@ class GateReport(BaseModel):
 
     checks: list[GateCheck] = Field(default_factory=list)
 
-    def check(self, item: str, ok: bool, note: str = "") -> "GateReport":
+    def check(self, item: str, ok: bool, note: str = "") -> GateReport:
         self.checks.append(GateCheck(item=item, ok=ok, note=note))
         return self
 
@@ -288,19 +295,20 @@ class AgentCall(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    output_type: Type[EnvelopeBase]
+    output_type: type[EnvelopeBase]
     prompt: str
-    previous: Optional[EnvelopeBase] = None
-    gates: list[Callable] = Field(default_factory=list)   # gate(envelope, run) -> list[str]
+    previous: EnvelopeBase | None = None
+    gates: list[Callable] = Field(default_factory=list)  # gate(envelope, run) -> list[str]
 
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
+
 class PromptEngineering(BaseModel):
     model_config = {"extra": "forbid"}
 
-    system: str                     # path to system.md
-    user: str                       # path to user.md
+    system: str  # path to system.md
+    user: str  # path to user.md
 
 
 class TimeoutConfig(BaseModel):
@@ -309,6 +317,10 @@ class TimeoutConfig(BaseModel):
     phase_seconds: int = Field(default=1800, gt=0)
     tool_seconds: int = Field(default=300, gt=0)
     correction_seconds: int = Field(default=300, gt=0)
+
+
+def _default_copilot_tools() -> list[str]:
+    return ["view", "rg", "glob", "bash", "apply_patch"]
 
 
 class AgentConfig(BaseModel):
@@ -321,11 +333,11 @@ class AgentConfig(BaseModel):
     color: str = ""
     purpose: str = ""
     prompt_engineering: PromptEngineering
-    tools: Optional[list[str]] = None
+    tools: list[str] = Field(default_factory=_default_copilot_tools, min_length=1)
     skill_directories: list[str] = Field(default_factory=list)
     plugin_directories: list[str] = Field(default_factory=list)
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    writes: Optional[list[str]] = None
+    writes: list[str] | None = None
     timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
 
     @field_validator("model")
@@ -346,18 +358,22 @@ class ConfigDefaults(BaseModel):
     reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] = "medium"
     context_tier: Literal["default", "long_context"] = "default"
     color: str = ""
-    tools: Optional[list[str]] = None    # roster-wide allowlist; None = all tools usable
+    tools: list[str] = Field(default_factory=_default_copilot_tools, min_length=1)
     skill_directories: list[str] = Field(default_factory=list)
     plugin_directories: list[str] = Field(default_factory=list)
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    writes: Optional[list[str]] = None
+    writes: list[str] | None = None
     timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
     # Off-limits to every agent that has not named them in its own `writes`.
     # The factory's own code is the default: an agent must not be able to edit
     # the machinery that decides whether its work passed.
-    protected_files: list[str] = Field(default_factory=lambda: [
-        "adws/adw_modules/", "adws/adw_sssf_config/", "adws/adw_*.py",
-    ])
+    protected_files: list[str] = Field(
+        default_factory=lambda: [
+            "adws/adw_modules/",
+            "adws/adw_sssf_config/",
+            "adws/adw_*.py",
+        ]
+    )
     data_dir: str = "adws/adw_data"
 
     @field_validator("model")
@@ -388,25 +404,27 @@ class SSSFConfig(BaseModel):
 
 # ── Tracing ──────────────────────────────────────────────────────────────────
 
+
 class EventRecord(BaseModel):
     """One traced event, always logged against adw_id + phase."""
 
     adw_id: str
     phase_id: str = ""
-    type: str                       # phase_start | agent_start | tool_call | handoff | gate_pass | gate_fail | log | agent_end | phase_end | error
+    type: str  # phase_start | agent_start | tool_call | handoff | gate_pass | gate_fail | log | agent_end | phase_end | error
     name: str = ""
     payload: dict[str, Any] = Field(default_factory=dict)
     parent_id: str = ""
-    tokens: Optional[int] = None
+    tokens: int | None = None
     # Spans: set both when an event covers real elapsed time (a tool call), so
     # the UI lays it out on a time axis without parsing payload JSON. Left unset,
     # the tracer stamps started_at with the moment the event was recorded.
-    started_at: Optional[str] = None
-    ended_at: Optional[str] = None
+    started_at: str | None = None
+    ended_at: str | None = None
 
 
 class UsageBreakdown(BaseModel):
     """Normalized token and cost totals, summed over a call."""
+
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
@@ -432,43 +450,33 @@ class UsageBreakdown(BaseModel):
         cost = usage.get("cost") or {}
         self.input_tokens += usage.get("input_tokens") or usage.get("input") or 0
         self.output_tokens += usage.get("output_tokens") or usage.get("output") or 0
-        self.cache_read_tokens += (
-            usage.get("cache_read_tokens") or usage.get("cacheRead") or 0
-        )
-        self.cache_write_tokens += (
-            usage.get("cache_write_tokens") or usage.get("cacheWrite") or 0
-        )
-        self.reasoning_tokens += (
-            usage.get("reasoning_tokens") or usage.get("reasoning") or 0
-        )
+        self.cache_read_tokens += usage.get("cache_read_tokens") or usage.get("cacheRead") or 0
+        self.cache_write_tokens += usage.get("cache_write_tokens") or usage.get("cacheWrite") or 0
+        self.reasoning_tokens += usage.get("reasoning_tokens") or usage.get("reasoning") or 0
         self.total_tokens += total_tokens
         self.input_cost += usage.get("input_cost") or cost.get("input") or 0.0
         self.output_cost += usage.get("output_cost") or cost.get("output") or 0.0
-        self.cache_read_cost += (
-            usage.get("cache_read_cost") or cost.get("cacheRead") or 0.0
-        )
-        self.cache_write_cost += (
-            usage.get("cache_write_cost") or cost.get("cacheWrite") or 0.0
-        )
+        self.cache_read_cost += usage.get("cache_read_cost") or cost.get("cacheRead") or 0.0
+        self.cache_write_cost += usage.get("cache_write_cost") or cost.get("cacheWrite") or 0.0
         self.total_cost += usage.get("total_cost") or cost.get("total") or 0.0
 
-    def merge(self, other: "UsageBreakdown") -> None:
+    def merge(self, other: UsageBreakdown) -> None:
         """Add another call's usage — a phase that retries spends more than once."""
-        for field in self.model_fields:
+        for field in type(self).model_fields:
             setattr(self, field, getattr(self, field) + getattr(other, field))
 
 
 class AgentEvent(BaseModel):
     type: str
     payload: dict[str, Any] = Field(default_factory=dict)
-    started_at: Optional[str] = None
-    ended_at: Optional[str] = None
+    started_at: str | None = None
+    ended_at: str | None = None
 
 
 class AgentCallbacks(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
-    on_event: Optional[Callable[[AgentEvent], None]] = None
+    on_event: Callable[[AgentEvent], None] | None = None
 
 
 class AgentRequest(BaseModel):
@@ -481,7 +489,7 @@ class AgentRequest(BaseModel):
     resume: bool = False
     runtime_dir: str
     raw_output_path: str
-    tools: Optional[list[str]] = None
+    tools: list[str] = Field(min_length=1)
     skill_directories: list[str] = Field(default_factory=list)
     plugin_directories: list[str] = Field(default_factory=list)
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
@@ -502,4 +510,4 @@ class AgentResult(BaseModel):
     usage: UsageBreakdown = Field(default_factory=UsageBreakdown)
     context_tokens: int = 0
     context_window: int = 0
-    runtime: Optional[RuntimeInfo] = None
+    runtime: RuntimeInfo | None = None

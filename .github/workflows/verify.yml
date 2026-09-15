@@ -1,0 +1,27 @@
+name: verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: extractions/setup-just@v3
+      - uses: oven-sh/setup-bun@v2
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config lychee.toml '**/*.md'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: uv sync --locked --group dev
+      - run: just fmt-check lint typecheck test plugin-check skill-check visualizer-build

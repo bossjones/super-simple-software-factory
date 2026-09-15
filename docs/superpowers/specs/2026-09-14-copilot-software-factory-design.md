@@ -87,6 +87,7 @@ The Copilot runtime is a deep module. Its orchestration-facing interface is smal
 ```python
 def validate(config: CopilotRuntimeConfig) -> CopilotRuntimeInfo: ...
 
+
 def run(
     request: AgentRequest,
     callbacks: AgentCallbacks,
@@ -210,7 +211,18 @@ Each configured agent has:
 - Repository `writes` patterns.
 - Phase, tool, correction, and total timeout budgets.
 
-Copilot receives the narrowest tool set needed for the phase. Permission callbacks and hooks deny operations outside the phase policy where possible. SSSF then independently snapshots repository state and enforces `writes` plus protected files after every call.
+Copilot receives the narrowest tool set needed for the phase through SDK
+`available_tools`. The current callback returns no result for
+managed-approval requests and approve-once for ordinary permission requests.
+Because SSSF uses SDK empty mode, every resolved agent has an explicit,
+non-empty tool allowlist; `null` is not interpreted as all tools. Configured
+skill directories explicitly enable SDK skill loading, and configured plugin
+directories are passed on both create and resume.
+The tool list is capability gating; the callback is not a path-aware
+repository policy, and SSSF does not currently install a path-aware
+`preToolUse` hook. SSSF snapshots repository state and enforces `writes` plus
+protected files after every call. That post-send comparison and rollback is
+the authoritative repository boundary.
 
 The write snapshot remains the final repository policy control because shell access and tool filters do not form a complete containment boundary. Authenticated production execution should run in an isolated worktree or container with restricted network and process limits.
 
@@ -398,11 +410,16 @@ An opt-in smoke target:
 - Checks supported authentication without printing credentials.
 - Starts the pinned runtime.
 - Creates a session in a temporary fixture repository.
-- Executes one read-only prompt.
-- Executes one bounded write prompt.
-- Verifies event capture, final envelope parsing, and write enforcement.
-- Resumes the session for a correction turn.
+- Executes a read-only prompt with only the view capability.
+- Verifies event capture and exact final-envelope parsing.
+- Resumes the same session for a correction turn and verifies the corrected
+  envelope and additional event capture.
 - Cleans up the fixture without deleting persistent user sessions.
+
+Allowed-write and unauthorized-write rollback are deterministic orchestration
+tests rather than live-model assertions. Keeping those checks credential-free
+avoids making repository containment acceptance depend on nondeterministic
+tool selection by an external model.
 
 The smoke test is not required for default CI.
 

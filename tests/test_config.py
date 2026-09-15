@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 import yaml
-
 from adw_modules import agents
 from adw_modules.data_types import AgentConfig, SSSFConfig
 
@@ -20,12 +19,14 @@ def test_copilot_config_merges_defaults(tmp_path: Path):
             "tools": ["view", "rg", "glob"],
             "timeouts": {"phase_seconds": 600, "tool_seconds": 120},
         },
-        "agents": [{
-            "name": "scout",
-            "purpose": "Read only",
-            "prompt_engineering": {"system": str(system), "user": str(user)},
-            "writes": [],
-        }],
+        "agents": [
+            {
+                "name": "scout",
+                "purpose": "Read only",
+                "prompt_engineering": {"system": str(system), "user": str(user)},
+                "writes": [],
+            }
+        ],
     }
     path = tmp_path / "config.yaml"
     path.write_text(yaml.safe_dump(raw))
@@ -48,11 +49,13 @@ def test_copilot_config_merges_partial_timeout_overrides(tmp_path: Path):
                 "correction_seconds": 90,
             },
         },
-        "agents": [{
-            "name": "scout",
-            "prompt_engineering": {"system": "system.md", "user": "user.md"},
-            "timeouts": {"phase_seconds": 42},
-        }],
+        "agents": [
+            {
+                "name": "scout",
+                "prompt_engineering": {"system": "system.md", "user": "user.md"},
+                "timeouts": {"phase_seconds": 42},
+            }
+        ],
     }
     path = tmp_path / "config.yaml"
     path.write_text(yaml.safe_dump(raw))
@@ -66,46 +69,58 @@ def test_copilot_config_merges_partial_timeout_overrides(tmp_path: Path):
 
 def test_removed_pi_fields_are_rejected():
     with pytest.raises(ValueError, match="coding_agent"):
-        AgentConfig.model_validate({
-            "name": "builder",
-            "coding_agent": "pi",
-            "purpose": "Build",
-            "prompt_engineering": {"system": "system.md", "user": "user.md"},
-        })
+        AgentConfig.model_validate(
+            {
+                "name": "builder",
+                "coding_agent": "pi",
+                "purpose": "Build",
+                "prompt_engineering": {"system": "system.md", "user": "user.md"},
+            }
+        )
 
 
 def test_nested_config_extra_fields_are_rejected():
     with pytest.raises(ValueError, match="unexpected"):
-        AgentConfig.model_validate({
-            "name": "builder",
-            "prompt_engineering": {
-                "system": "system.md",
-                "user": "user.md",
-                "unexpected": True,
-            },
-        })
+        AgentConfig.model_validate(
+            {
+                "name": "builder",
+                "prompt_engineering": {
+                    "system": "system.md",
+                    "user": "user.md",
+                    "unexpected": True,
+                },
+            }
+        )
     with pytest.raises(ValueError, match="unexpected"):
         SSSFConfig.model_validate({"observability": {"unexpected": True}})
 
 
 def test_provider_qualified_models_are_rejected():
     with pytest.raises(ValueError, match="provider-qualified"):
-        AgentConfig.model_validate({
-            "name": "builder",
-            "model": "google/gemini-3.6-flash",
-            "prompt_engineering": {"system": "system.md", "user": "user.md"},
-        })
+        AgentConfig.model_validate(
+            {
+                "name": "builder",
+                "model": "google/gemini-3.6-flash",
+                "prompt_engineering": {"system": "system.md", "user": "user.md"},
+            }
+        )
 
 
 def test_provider_qualified_models_are_rejected_when_loading_yaml(tmp_path: Path):
     path = tmp_path / "config.yaml"
-    path.write_text(yaml.safe_dump({
-        "defaults": {"model": "openai/gpt-5.4"},
-        "agents": [{
-            "name": "builder",
-            "prompt_engineering": {"system": "system.md", "user": "user.md"},
-        }],
-    }))
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "defaults": {"model": "openai/gpt-5.4"},
+                "agents": [
+                    {
+                        "name": "builder",
+                        "prompt_engineering": {"system": "system.md", "user": "user.md"},
+                    }
+                ],
+            }
+        )
+    )
 
     with pytest.raises(ValueError, match="provider-qualified"):
         agents.load_config(str(path))
@@ -116,4 +131,17 @@ def test_default_config_is_copilot_only(repo_root: Path):
         yaml.safe_load((repo_root / "skills/sssf/templates/sssf.config.yaml").read_text())
     )
     assert config.defaults.model
+    assert config.defaults.tools == ["view", "rg", "glob", "bash", "apply_patch"]
     assert all(not hasattr(agent, "coding_agent") for agent in config.agents)
+
+
+@pytest.mark.parametrize("tools", [None, []])
+def test_empty_mode_requires_explicit_non_empty_tools(tools):
+    with pytest.raises(ValueError, match="tools"):
+        AgentConfig.model_validate(
+            {
+                "name": "builder",
+                "prompt_engineering": {"system": "system.md", "user": "user.md"},
+                "tools": tools,
+            }
+        )

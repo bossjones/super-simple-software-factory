@@ -34,7 +34,7 @@ from .data_types import (
 )
 from .utils import new_id
 
-JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
+JSON_FIX_ATTEMPTS = 2  # continue-with-correction attempts for malformed JSON
 
 
 class GateFailure(RuntimeError):
@@ -53,13 +53,21 @@ class _TraceAgent:
 
 # ── config ───────────────────────────────────────────────────────────────────
 
+
 def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConfig:
     raw = yaml.safe_load(Path(path).read_text()) or {}
     defaults = raw.get("defaults", {}) or {}
     for agent in raw.get("agents", []) or []:
         for key in (
-            "model", "reasoning_effort", "context_tier", "color", "tools",
-            "skill_directories", "plugin_directories", "mcp_servers", "writes",
+            "model",
+            "reasoning_effort",
+            "context_tier",
+            "color",
+            "tools",
+            "skill_directories",
+            "plugin_directories",
+            "mcp_servers",
+            "writes",
             "timeouts",
         ):
             if key in defaults:
@@ -78,8 +86,9 @@ def resolve(cfg: SSSFConfig, name: str) -> AgentConfig:
     for agent in cfg.agents:
         if agent.name == name:
             return agent
-    raise SystemExit(f"agent {name!r} is not defined in the config — "
-                     f"available: {[a.name for a in cfg.agents]}")
+    raise SystemExit(
+        f"agent {name!r} is not defined in the config — available: {[a.name for a in cfg.agents]}"
+    )
 
 
 def validate(cfg: SSSFConfig, required: list[str]) -> None:
@@ -91,8 +100,10 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
         except SystemExit as e:
             problems.append(str(e))
             continue
-        for label, ref in (("system", agent.prompt_engineering.system),
-                           ("user", agent.prompt_engineering.user)):
+        for label, ref in (
+            ("system", agent.prompt_engineering.system),
+            ("user", agent.prompt_engineering.user),
+        ):
             if not Path(ref).is_file():
                 problems.append(f"agent {name!r}: {label} prompt not found: {ref}")
     if problems:
@@ -101,6 +112,7 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
 
 
 # ── execution ────────────────────────────────────────────────────────────────
+
 
 def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     """One agent call: render prompts -> Copilot -> typed parse -> gates -> envelope."""
@@ -119,18 +131,26 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     prompts.save(agent_dir / "prompts", "user.md", user_text)
 
     session_id = _agent_session_id(run, agent)
-    run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
-                                 type="agent_start", name=agent.name,
-                                 payload={"model": agent.model,
-                                          "reasoning_effort": agent.reasoning_effort,
-                                          "context_tier": agent.context_tier,
-                                          "session_id": session_id,
-                                          "coding_agent": "copilot",
-                                          "purpose": agent.purpose,
-                                          "tools": agent.tools,  # None = all tools
-                                          "skill_directories": agent.skill_directories,
-                                          "plugin_directories": agent.plugin_directories,
-                                          "mcp_servers": sorted(agent.mcp_servers)}))
+    run.tracer.event(
+        EventRecord(
+            adw_id=run.adw_id,
+            phase_id=phase.phase_id,
+            type="agent_start",
+            name=agent.name,
+            payload={
+                "model": agent.model,
+                "reasoning_effort": agent.reasoning_effort,
+                "context_tier": agent.context_tier,
+                "session_id": session_id,
+                "coding_agent": "copilot",
+                "purpose": agent.purpose,
+                "tools": agent.tools,
+                "skill_directories": agent.skill_directories,
+                "plugin_directories": agent.plugin_directories,
+                "mcp_servers": sorted(agent.mcp_servers),
+            },
+        )
+    )
     run.console.agent_started(agent.name, agent.model, session_id)
 
     # Parse retries and gate corrections re-enter the SAME Copilot session, so the
@@ -158,24 +178,28 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             if operation_error is not None:
                 payload["operation_error"] = str(operation_error)
                 payload["operation_error_type"] = type(operation_error).__name__
-            run.tracer.event(EventRecord(
-                adw_id=run.adw_id,
-                phase_id=phase.phase_id,
-                type="error",
-                name="permission_breach",
-                payload=payload,
-            ))
+            run.tracer.event(
+                EventRecord(
+                    adw_id=run.adw_id,
+                    phase_id=phase.phase_id,
+                    type="error",
+                    name="permission_breach",
+                    payload=payload,
+                )
+            )
             if operation_error is not None:
                 raise breach from operation_error
             raise
         if touched:
-            run.tracer.event(EventRecord(
-                adw_id=run.adw_id,
-                phase_id=phase.phase_id,
-                type="log",
-                name="paths_touched",
-                payload={"agent": agent.name, "paths": touched},
-            ))
+            run.tracer.event(
+                EventRecord(
+                    adw_id=run.adw_id,
+                    phase_id=phase.phase_id,
+                    type="log",
+                    name="paths_touched",
+                    payload={"agent": agent.name, "paths": touched},
+                )
+            )
 
     def send(prompt_text: str) -> AgentResult:
         nonlocal latest, session_active
@@ -203,13 +227,15 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                 AgentCallbacks(on_event=_event_forwarder(run, phase, agent.name)),
             )
         except BaseException as error:
-            run.tracer.event(EventRecord(
-                adw_id=run.adw_id,
-                phase_id=phase.phase_id,
-                type="error",
-                name=agent.name,
-                payload={"agent": agent.name, "error": str(error)},
-            ))
+            run.tracer.event(
+                EventRecord(
+                    adw_id=run.adw_id,
+                    phase_id=phase.phase_id,
+                    type="error",
+                    name=agent.name,
+                    payload={"agent": agent.name, "error": str(error)},
+                )
+            )
             operation_error = error
             raise
         else:
@@ -231,24 +257,37 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             report = _as_report(gate(envelope, run))
             found = report.violations
             run.tracer.gate_row(phase, gate.__name__, report, gate_attempt)
-            run.tracer.event(EventRecord(
-                adw_id=run.adw_id, phase_id=phase.phase_id,
-                type="gate_fail" if found else "gate_pass", name=gate.__name__,
-                payload={"attempt": gate_attempt, "violations": found,
-                         "checks": [c.model_dump() for c in report.checks]}))
+            run.tracer.event(
+                EventRecord(
+                    adw_id=run.adw_id,
+                    phase_id=phase.phase_id,
+                    type="gate_fail" if found else "gate_pass",
+                    name=gate.__name__,
+                    payload={
+                        "attempt": gate_attempt,
+                        "violations": found,
+                        "checks": [c.model_dump() for c in report.checks],
+                    },
+                )
+            )
             run.console.gate_result(gate.__name__, report)
             violations.extend(found)
         if not violations:
             break
         if gate_attempt > phase.params.retries:
-            raise GateFailure(f"{agent.name} failed gates after {gate_attempt} attempt(s):\n- "
-                              + "\n- ".join(violations))
+            raise GateFailure(
+                f"{agent.name} failed gates after {gate_attempt} attempt(s):\n- "
+                + "\n- ".join(violations)
+            )
         phase.attempt = gate_attempt
-        run.console.retry(agent.name, gate_attempt, phase.params.retries,
-                          f"{len(violations)} gate violation(s)")
-        correction = ("Your previous response failed validation:\n- "
-                      + "\n- ".join(violations)
-                      + "\n\nFix these problems, then re-emit ONLY your Report JSON.")
+        run.console.retry(
+            agent.name, gate_attempt, phase.params.retries, f"{len(violations)} gate violation(s)"
+        )
+        correction = (
+            "Your previous response failed validation:\n- "
+            + "\n- ".join(violations)
+            + "\n\nFix these problems, then re-emit ONLY your Report JSON."
+        )
         result = send(correction)
         envelope, attempt = _parse_with_retries(run, phase, call, result, send)
 
@@ -269,39 +308,39 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
         context_window=context.context_window,
         runtime=context.runtime,
     )
-    run.save_agent_map(agent.name, {"session_id": session_id, "model": agent.model,
-                                    "runtime": "copilot"})
-    run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
-                                 type="handoff", name=agent.name,
-                                 payload={"artifacts": envelope.artifacts,
-                                          "summary": envelope.summary}))
-    run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
-                                 type="agent_end", name=agent.name,
-                                 # Phase totals, not the last send's: a retried
-                                 # phase paid for every attempt.
-                                 tokens=spent.total_tokens,
-                                 payload={"cost": spent.total_cost,
-                                          "usage": spent.model_dump(),
-                                          "context_tokens": context.context_tokens,
-                                          "context_window": context.context_window,
-                                          "sdk_version": (
-                                              context.runtime.sdk_version
-                                              if context.runtime
-                                              else ""
-                                          ),
-                                          "runtime_version": (
-                                              context.runtime.runtime_version
-                                              if context.runtime
-                                              else ""
-                                          ),
-                                          "protocol_version": (
-                                              context.runtime.protocol_version
-                                              if context.runtime
-                                              else ""
-                                          ),
-                                          "cli_version": (
-                                              context.runtime.cli_version if context.runtime else ""
-                                          )}))
+    run.save_agent_map(
+        agent.name, {"session_id": session_id, "model": agent.model, "runtime": "copilot"}
+    )
+    run.tracer.event(
+        EventRecord(
+            adw_id=run.adw_id,
+            phase_id=phase.phase_id,
+            type="handoff",
+            name=agent.name,
+            payload={"artifacts": envelope.artifacts, "summary": envelope.summary},
+        )
+    )
+    run.tracer.event(
+        EventRecord(
+            adw_id=run.adw_id,
+            phase_id=phase.phase_id,
+            type="agent_end",
+            name=agent.name,
+            # Phase totals, not the last send's: a retried
+            # phase paid for every attempt.
+            tokens=spent.total_tokens,
+            payload={
+                "cost": spent.total_cost,
+                "usage": spent.model_dump(),
+                "context_tokens": context.context_tokens,
+                "context_window": context.context_window,
+                "sdk_version": (context.runtime.sdk_version if context.runtime else ""),
+                "runtime_version": (context.runtime.runtime_version if context.runtime else ""),
+                "protocol_version": (context.runtime.protocol_version if context.runtime else ""),
+                "cli_version": (context.runtime.cli_version if context.runtime else ""),
+            },
+        )
+    )
     run.console.agent_finished(agent.name, spent.total_tokens, spent.total_cost)
     if envelope.status != "success":
         raise RuntimeError(f"{agent.name} reported status={envelope.status!r}: {envelope.summary}")
@@ -309,6 +348,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
 
 
 # ── internals ────────────────────────────────────────────────────────────────
+
 
 def _as_report(result) -> GateReport:
     """Accept a GateReport, or a legacy gate that returned a violations list."""
@@ -320,7 +360,7 @@ def _as_report(result) -> GateReport:
 def _agent_session_id(run, agent: AgentConfig) -> str:
     entry = run.agent_map.get(agent.name)
     if entry and entry.get("model") == agent.model and entry.get("runtime") == "copilot":
-        return entry["session_id"]           # rejoin the existing context window
+        return entry["session_id"]  # rejoin the existing context window
     return f"sssf-{run.adw_id}-{agent.name}-{new_id(4)}"
 
 
@@ -339,11 +379,18 @@ def _event_forwarder(run, phase: Phase, agent_name: str):
 
     def forward(event: AgentEvent) -> None:
         payload = dict(event.payload)
-        run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
-                                     type=event.type, name=str(payload.pop("label", event.type)),
-                                     started_at=event.started_at,
-                                     ended_at=event.ended_at,
-                                     payload={**payload, "agent": agent_name}))
+        run.tracer.event(
+            EventRecord(
+                adw_id=run.adw_id,
+                phase_id=phase.phase_id,
+                type=event.type,
+                name=str(payload.pop("label", event.type)),
+                started_at=event.started_at,
+                ended_at=event.ended_at,
+                payload={**payload, "agent": agent_name},
+            )
+        )
+
     return forward
 
 
@@ -358,11 +405,14 @@ def _extract_json(text: str) -> dict:
     start, end = candidate.find("{"), candidate.rfind("}")
     if start == -1 or end <= start:
         raise ValueError("no JSON object found in the response")
-    return json.loads(candidate[start:end + 1])
+    return json.loads(candidate[start : end + 1])
 
 
 def _parse_with_retries(
-    run, phase: Phase, call: AgentCall, result: AgentResult,
+    run,
+    phase: Phase,
+    call: AgentCall,
+    result: AgentResult,
     send: Callable[[str], AgentResult],
 ) -> tuple[EnvelopeBase, int]:
     """Parse the final response against the declared output type; on failure,
@@ -372,34 +422,51 @@ def _parse_with_retries(
             payload = _extract_json(result.text)
             return call.output_type.model_validate(payload), attempt
         except Exception as error:
-            _persist_envelope(run, phase, phase.params.owner, call, None, attempt,
-                              valid=False, raw=result.text)
+            _persist_envelope(
+                run, phase, phase.params.owner, call, None, attempt, valid=False, raw=result.text
+            )
             if attempt > JSON_FIX_ATTEMPTS:
                 raise RuntimeError(
                     f"{phase.params.owner} never produced valid "
-                    f"{call.output_type.__name__} JSON: {error}") from error
-            run.console.retry(phase.params.owner, attempt, JSON_FIX_ATTEMPTS,
-                              f"invalid {call.output_type.__name__} JSON: {error}")
+                    f"{call.output_type.__name__} JSON: {error}"
+                ) from error
+            run.console.retry(
+                phase.params.owner,
+                attempt,
+                JSON_FIX_ATTEMPTS,
+                f"invalid {call.output_type.__name__} JSON: {error}",
+            )
             fields = ", ".join(call.output_type.model_fields.keys())
             result = send(
                 f"Your response was not valid JSON for the required structure "
                 f"({error}). Respond again with ONLY a JSON object with these "
-                f"fields: {fields}. No prose, no code fences.")
+                f"fields: {fields}. No prose, no code fences."
+            )
     raise AssertionError("unreachable: retry loop must return or raise")
 
 
-def _persist_envelope(run, phase: Phase, agent_name: str, call: AgentCall,
-                      envelope: EnvelopeBase | None, attempt: int,
-                      valid: bool, raw: str = "") -> None:
+def _persist_envelope(
+    run,
+    phase: Phase,
+    agent_name: str,
+    call: AgentCall,
+    envelope: EnvelopeBase | None,
+    attempt: int,
+    valid: bool,
+    raw: str = "",
+) -> None:
     payload_json = (
-        envelope.model_dump_json(indent=2)
-        if envelope
-        else json.dumps({"raw": raw[-2000:]})
+        envelope.model_dump_json(indent=2) if envelope else json.dumps({"raw": raw[-2000:]})
     )
-    run.tracer.envelope_row(phase, agent_name, call.output_type.__name__,
-                            payload_json, valid, attempt)
+    run.tracer.envelope_row(
+        phase, agent_name, call.output_type.__name__, payload_json, valid, attempt
+    )
     if envelope:
-        record = {"agent_name": agent_name, "purpose": resolve(run.cfg, agent_name).purpose,
-                  "output_type": call.output_type.__name__, "attempt": attempt,
-                  **envelope.model_dump()}
+        record = {
+            "agent_name": agent_name,
+            "purpose": resolve(run.cfg, agent_name).purpose,
+            "output_type": call.output_type.__name__,
+            "attempt": attempt,
+            **envelope.model_dump(),
+        }
         (run.session_dir / agent_name / "envelope.json").write_text(json.dumps(record, indent=2))

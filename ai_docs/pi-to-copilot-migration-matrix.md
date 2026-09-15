@@ -1,7 +1,8 @@
 # Pi to Copilot Migration Matrix
 
 verified_on: 2026-09-14
-scope: This page maps the Pi-backed factory surfaces to Copilot-native equivalents and calls out the host responsibilities that do not move into Copilot.
+historical: true
+scope: This historical page maps the former Pi-backed factory surfaces to Copilot-native equivalents and calls out the host responsibilities that did not move into Copilot.
 
 | SSSF need | Pi baseline | Copilot source of truth | Port decision |
 |---|---|---|---|

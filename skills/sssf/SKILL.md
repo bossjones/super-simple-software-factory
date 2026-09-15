@@ -43,9 +43,11 @@ Deep contracts are lazy-loaded from
 3. Keep malformed-output and gate corrections in the same Copilot session.
 4. Use deterministic code phases for known commands, tests, commits, and
    migrations.
-5. Treat `writes` and protected paths as the repository policy boundary.
-6. Subscribe to Copilot events during session creation/resume; normalize them
-   before they enter the SSSF trace.
+5. Treat post-send `writes` and protected-path enforcement as the authoritative
+   repository boundary. `available_tools` narrows capabilities; the
+   approve-once callback does not enforce path policy before execution.
+6. Subscribe to Copilot events during session creation/resume; redact and
+   normalize them before they enter raw JSONL or the SSSF trace.
 7. Treat `session.idle` as mechanical completion. A wait timeout is not an
    abort; call `session.abort()` on a deadline.
 8. Disconnect to preserve resumable state. Never silently create a replacement

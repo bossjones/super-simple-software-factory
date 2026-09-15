@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Any
 
 from .data_types import AgentEvent, UsageBreakdown
+from .redaction import REDACTED, is_sensitive_key, redact_text
 
 RESULT_SNIPPET_CHARS = 20_000
 ARG_VALUE_CHARS = 20_000
@@ -32,27 +33,23 @@ def _safe_value(
     exclude_reasoning: bool = False,
 ) -> Any:
     if isinstance(value, str):
-        return _clip(value, limit)
+        return _clip(redact_text(value), limit)
     if isinstance(value, Enum):
         return _safe_value(value.value, limit, exclude_reasoning=exclude_reasoning)
     if isinstance(value, Mapping):
         return {
-            str(key): _safe_value(
-                value[key], limit, exclude_reasoning=exclude_reasoning
+            str(key): (
+                REDACTED
+                if is_sensitive_key(key)
+                else _safe_value(value[key], limit, exclude_reasoning=exclude_reasoning)
             )
             for key in sorted(value, key=str)
             if not (exclude_reasoning and "reasoning" in str(key).lower())
         }
     if isinstance(value, list):
-        return [
-            _safe_value(item, limit, exclude_reasoning=exclude_reasoning)
-            for item in value
-        ]
+        return [_safe_value(item, limit, exclude_reasoning=exclude_reasoning) for item in value]
     if isinstance(value, tuple):
-        return [
-            _safe_value(item, limit, exclude_reasoning=exclude_reasoning)
-            for item in value
-        ]
+        return [_safe_value(item, limit, exclude_reasoning=exclude_reasoning) for item in value]
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     model_dump = getattr(value, "model_dump", None)
@@ -92,7 +89,7 @@ def _label(tool: str, arguments: Any) -> str:
     for key in ("command", "path", "file_path", "pattern", "query", "url"):
         value = arguments.get(key)
         if isinstance(value, str) and value.strip():
-            return f"{tool}: {_clip(' '.join(value.split()), 80)}"
+            return f"{tool}: {_clip(redact_text(' '.join(value.split())), 80)}"
     return tool
 
 
@@ -152,9 +149,8 @@ class CopilotEventNormalizer:
         self._open_tools[call_id] = {
             "tool": str(getattr(data, "tool_name", "") or existing.get("tool", "tool")),
             "args": arguments if arguments is not None else existing.get("args", {}),
-            "started_at": existing.get("started_at") or _timestamp(
-                getattr(event, "timestamp", None)
-            ),
+            "started_at": existing.get("started_at")
+            or _timestamp(getattr(event, "timestamp", None)),
             "partial_results": existing.get("partial_results", []),
             "progress": existing.get("progress", []),
         }
@@ -168,18 +164,22 @@ class CopilotEventNormalizer:
         data = getattr(event, "data", None)
         call_id = str(getattr(data, "tool_call_id", "") or "")
         if not call_id:
-            return [self._error_event(
-                event,
-                reason="invalid_tool_update_id",
-                evidence={"tool_call_id": call_id},
-            )]
+            return [
+                self._error_event(
+                    event,
+                    reason="invalid_tool_update_id",
+                    evidence={"tool_call_id": call_id},
+                )
+            ]
         opened = self._open_tools.get(call_id)
         if opened is None:
-            return [self._error_event(
-                event,
-                reason="unmatched_tool_update",
-                evidence={"tool_call_id": call_id},
-            )]
+            return [
+                self._error_event(
+                    event,
+                    reason="unmatched_tool_update",
+                    evidence={"tool_call_id": call_id},
+                )
+            ]
         update = getattr(data, field_name, None)
         if update is not None:
             opened.setdefault(collection_name, []).append(_safe_value(update))
@@ -223,7 +223,7 @@ class CopilotEventNormalizer:
         result = getattr(data, "result", None)
         result_text = _text_of_result(result)
         if result_text:
-            payload["result_snippet"] = _clip(result_text, RESULT_SNIPPET_CHARS)
+            payload["result_snippet"] = _clip(redact_text(result_text), RESULT_SNIPPET_CHARS)
         error = getattr(data, "error", None)
         if error is not None:
             payload["error"] = _safe_value(error)
@@ -237,9 +237,7 @@ class CopilotEventNormalizer:
     def _interrupt_tools(self, event: Any) -> list[AgentEvent]:
         data = getattr(event, "data", None)
         call_ids = [
-            str(call_id)
-            for call_id in (getattr(data, "tool_call_ids", None) or [])
-            if str(call_id)
+            str(call_id) for call_id in (getattr(data, "tool_call_ids", None) or []) if str(call_id)
         ]
         if not call_ids:
             call_ids = sorted(self._open_tools)
@@ -248,11 +246,13 @@ class CopilotEventNormalizer:
             if call_id in self._open_tools:
                 records.extend(self._close_open_tools("interrupted", [call_id]))
             else:
-                records.append(self._error_event(
-                    event,
-                    reason="unmatched_tool_interruption",
-                    evidence={"tool_call_id": call_id},
-                ))
+                records.append(
+                    self._error_event(
+                        event,
+                        reason="unmatched_tool_interruption",
+                        evidence={"tool_call_id": call_id},
+                    )
+                )
         if not records:
             records.append(self._error_event(event, reason="agent_interrupted"))
         return records
@@ -346,10 +346,12 @@ class CopilotEventNormalizer:
                 payload["event_reason"] = payload["reason"]
             payload["reason"] = reason
         if evidence:
-            payload.update({
-                str(key): _safe_value(value, exclude_reasoning=True)
-                for key, value in evidence.items()
-            })
+            payload.update(
+                {
+                    str(key): _safe_value(value, exclude_reasoning=True)
+                    for key, value in evidence.items()
+                }
+            )
         return AgentEvent(type="error", payload=payload)
 
     def _safe_payload(self, event: Any) -> dict[str, Any]:

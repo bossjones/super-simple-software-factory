@@ -33,11 +33,16 @@ from __future__ import annotations
 import shlex
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
-from .data_types import (EventRecord, QualityCheckResult, QualityCheckSpec, QualityResult,
-                         VerifyOutput)
+from .data_types import (
+    EventRecord,
+    QualityCheckResult,
+    QualityCheckSpec,
+    QualityResult,
+    VerifyOutput,
+)
 from .utils import now_iso, operator_env
 
 # How much of a failing command's output rides back inside the envelope. Enough
@@ -46,10 +51,19 @@ from .utils import now_iso, operator_env
 TAIL_CHARS = 4_000
 
 
+def _as_text(value: str | bytes | None) -> str:
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return value or ""
+
+
 def _placeholder(name: str) -> list[str]:
     """A command that does nothing and admits it. Replace every call to this."""
-    return ["echo", f"PLACEHOLDER {name}: edit adws/adw_modules/quality.py and "
-                    f"replace this echo with the real {name} command"]
+    return [
+        "echo",
+        f"PLACEHOLDER {name}: edit adws/adw_modules/quality.py and "
+        f"replace this echo with the real {name} command",
+    ]
 
 
 def _check_dir(run, name: str) -> Path:
@@ -64,7 +78,7 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
     output_dir = _check_dir(run, spec.name)
     output_artifact = output_dir / "command.log"
     command = shlex.join(spec.argv)
-    env = operator_env()             # the engineer's own shell environment
+    env = operator_env()  # the engineer's own shell environment
 
     run.console.note(f"quality {spec.name}: {command}")
     started_at = now_iso()
@@ -85,8 +99,8 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
         stderr = completed.stderr
     except subprocess.TimeoutExpired as error:
         returncode = 124
-        stdout = error.stdout or ""
-        stderr = (error.stderr or "") + f"\nTimed out after {spec.timeout_seconds}s."
+        stdout = _as_text(error.stdout)
+        stderr = _as_text(error.stderr) + f"\nTimed out after {spec.timeout_seconds}s."
     except OSError as error:
         # A missing binary lands here as exit 127 with the real message — no
         # pre-flight probe needed, and none wanted.
@@ -99,22 +113,24 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
         f"\n--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}\n"
     )
     passed = returncode == 0
-    run.tracer.event(EventRecord(
-        adw_id=run.adw_id,
-        phase_id=phase.phase_id,
-        type="tool_call",
-        name=f"quality:{spec.name}",
-        payload={
-            "area": spec.area,
-            "operation": spec.operation,
-            "command": command,
-            "returncode": returncode,
-            "passed": passed,
-            "output_artifact": str(output_artifact),
-        },
-        started_at=started_at,
-        ended_at=now_iso(),
-    ))
+    run.tracer.event(
+        EventRecord(
+            adw_id=run.adw_id,
+            phase_id=phase.phase_id,
+            type="tool_call",
+            name=f"quality:{spec.name}",
+            payload={
+                "area": spec.area,
+                "operation": spec.operation,
+                "command": command,
+                "returncode": returncode,
+                "passed": passed,
+                "output_artifact": str(output_artifact),
+            },
+            started_at=started_at,
+            ended_at=now_iso(),
+        )
+    )
     run.console.note(
         f"quality {spec.name}: {'passed' if passed else 'failed'} "
         f"(exit {returncode}, {duration:.1f}s)"
@@ -135,43 +151,57 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
 # ── Blocks ────────────────────────────────────────────────────────────────────
 # Replace every argv below. See the banner at the top of this file.
 
+
 def test(run) -> QualityCheckResult:
     """Run the project's test suite. The highest-value block to wire up first."""
-    return _run(QualityCheckSpec(
-        name="test",
-        area="backend",
-        operation="build",
-        argv=_placeholder("test"),        # e.g. ["bun", "test"] or ["uv", "run", "pytest", "-q"]
-        timeout_seconds=600,
-    ), run)
+    return _run(
+        QualityCheckSpec(
+            name="test",
+            area="backend",
+            operation="build",
+            argv=_placeholder("test"),  # e.g. ["bun", "test"] or ["uv", "run", "pytest", "-q"]
+            timeout_seconds=600,
+        ),
+        run,
+    )
 
 
 def lint(run) -> QualityCheckResult:
-    return _run(QualityCheckSpec(
-        name="lint",
-        area="backend",
-        operation="lint",
-        argv=_placeholder("lint"),        # e.g. ["bun", "x", "oxlint@1.36.0", "src"]
-    ), run)
+    return _run(
+        QualityCheckSpec(
+            name="lint",
+            area="backend",
+            operation="lint",
+            argv=_placeholder("lint"),  # e.g. ["bun", "x", "oxlint@1.36.0", "src"]
+        ),
+        run,
+    )
 
 
 def typecheck(run) -> QualityCheckResult:
-    return _run(QualityCheckSpec(
-        name="typecheck",
-        area="backend",
-        operation="typecheck",
-        argv=_placeholder("typecheck"),   # e.g. ["bun", "x", "tsc", "--noEmit"]
-    ), run)
+    return _run(
+        QualityCheckSpec(
+            name="typecheck",
+            area="backend",
+            operation="typecheck",
+            argv=_placeholder("typecheck"),  # e.g. ["bun", "x", "tsc", "--noEmit"]
+        ),
+        run,
+    )
 
 
 def build(run) -> QualityCheckResult:
-    output_dir = _check_dir(run, "build") / "bundle"
-    return _run(QualityCheckSpec(
-        name="build",
-        area="backend",
-        operation="build",
-        argv=_placeholder("build"),       # e.g. ["bun", "build", "src/index.ts", "--outdir", str(output_dir)]
-    ), run)
+    return _run(
+        QualityCheckSpec(
+            name="build",
+            area="backend",
+            operation="build",
+            argv=_placeholder(
+                "build"
+            ),  # e.g. ["bun", "build", "src/index.ts", "--outdir", str(output_dir)]
+        ),
+        run,
+    )
 
 
 def run_tests(run) -> QualityResult:
@@ -183,11 +213,17 @@ def run_tests(run) -> QualityResult:
     still reaches the builder through `as_envelope` below.
     """
     check = test(run)
-    failures = ([] if check.passed else
-                [f"{check.name}: `{check.command}` exited {check.returncode}\n"
-                 f"{check.output_tail}".rstrip()])
-    return QualityResult(passed=check.passed, checks=[check], failures=failures,
-                         artifacts=[check.output_artifact])
+    failures = (
+        []
+        if check.passed
+        else [
+            f"{check.name}: `{check.command}` exited {check.returncode}\n"
+            f"{check.output_tail}".rstrip()
+        ]
+    )
+    return QualityResult(
+        passed=check.passed, checks=[check], failures=failures, artifacts=[check.output_artifact]
+    )
 
 
 def as_envelope(result: QualityResult, what: str) -> VerifyOutput:
@@ -200,12 +236,18 @@ def as_envelope(result: QualityResult, what: str) -> VerifyOutput:
     """
     return VerifyOutput(
         status="success" if result.passed else "fail",
-        summary=(f"{what}: all {len(result.checks)} check(s) passed" if result.passed
-                 else f"{what}: {len(result.failures)} of {len(result.checks)} check(s) failed"),
+        summary=(
+            f"{what}: all {len(result.checks)} check(s) passed"
+            if result.passed
+            else f"{what}: {len(result.failures)} of {len(result.checks)} check(s) failed"
+        ),
         artifacts=result.artifacts,
-        notes_for_next_agent=("" if result.passed else
-                              "Fix every failure below. The output is verbatim from the "
-                              "command — trust it over any summary."),
+        notes_for_next_agent=(
+            ""
+            if result.passed
+            else "Fix every failure below. The output is verbatim from the "
+            "command — trust it over any summary."
+        ),
         passed=result.passed,
         failures=result.failures,
     )
@@ -230,7 +272,8 @@ def run_quality(run) -> QualityResult:
     # what the error "means" by a parser that guessed.
     failures = [
         f"{check.name}: `{check.command}` exited {check.returncode}\n{check.output_tail}".rstrip()
-        for check in checks if not check.passed
+        for check in checks
+        if not check.passed
     ]
     return QualityResult(
         passed=not failures,

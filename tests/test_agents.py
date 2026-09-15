@@ -286,19 +286,21 @@ def test_execute_builds_copilot_request_from_agent_config(monkeypatch, tmp_path:
     tool = next(event for event in run.tracer.events if event.type == "tool_call")
     assert tool.name == "view: README"
     assert tool.payload["agent"] == "builder"
-    assert run.tracer.sessions == [{
-        "agent": "builder",
-        "coding_agent": "copilot",
-        "session_id": request.session_id,
-        "context_tokens": 123,
-        "context_window": 456,
-        "runtime": RuntimeInfo(
-            sdk_version="1.0.13",
-            runtime_version="1.2.3",
-            protocol_version="3",
-            cli_version="1.0.0",
-        ),
-    }]
+    assert run.tracer.sessions == [
+        {
+            "agent": "builder",
+            "coding_agent": "copilot",
+            "session_id": request.session_id,
+            "context_tokens": 123,
+            "context_window": 456,
+            "runtime": RuntimeInfo(
+                sdk_version="1.0.13",
+                runtime_version="1.2.3",
+                protocol_version="3",
+                cli_version="1.0.0",
+            ),
+        }
+    ]
 
 
 def test_invalid_json_retries_same_session(monkeypatch, tmp_path: Path):
@@ -307,11 +309,7 @@ def test_invalid_json_retries_same_session(monkeypatch, tmp_path: Path):
 
     def fake_run(request, _callbacks):
         requests.append(request)
-        text = (
-            "not-json"
-            if len(requests) == 1
-            else '{"status": "success", "summary": "repaired"}'
-        )
+        text = "not-json" if len(requests) == 1 else '{"status": "success", "summary": "repaired"}'
         return result(text, request.session_id)
 
     monkeypatch.setattr(agents.agent_copilot, "run", fake_run)
@@ -394,6 +392,61 @@ def test_success_enforces_once_without_a_second_exit_check(monkeypatch, tmp_path
     agents.execute(run, phase(), call())
 
     assert calls == [None]
+
+
+def test_allowed_write_is_retained_and_traced(monkeypatch, tmp_path: Path):
+    run, _protected = _permission_run(tmp_path)
+    _use_real_permission_enforcement(monkeypatch)
+    allowed = tmp_path / "src" / "app.py"
+
+    def fake_run(request, _callbacks):
+        allowed.parent.mkdir()
+        allowed.write_text("print('allowed')\n")
+        return result(
+            '{"status":"success","summary":"implemented","artifacts":["src/app.py"]}',
+            request.session_id,
+        )
+
+    monkeypatch.setattr(agents.agent_copilot, "run", fake_run)
+
+    envelope = agents.execute(run, phase(), call())
+
+    assert envelope.status == "success"
+    assert allowed.read_text() == "print('allowed')\n"
+    touched = next(event for event in run.tracer.events if event.name == "paths_touched")
+    assert touched.payload["paths"] == ["src/app.py"]
+
+
+def test_success_same_size_same_line_rewrite_restores_staged_and_unstaged_user_work(
+    monkeypatch,
+    tmp_path: Path,
+):
+    run, protected = _permission_run(tmp_path)
+    _use_real_permission_enforcement(monkeypatch)
+    protected.write_text("staged user value\n")
+    _run_git(tmp_path, "add", "protected.txt")
+    protected.write_text("operator-version\n")
+
+    def fake_run(request, _callbacks):
+        protected.write_text("intruder-version\n")
+        return result('{"status":"success"}', request.session_id)
+
+    monkeypatch.setattr(agents.agent_copilot, "run", fake_run)
+
+    with pytest.raises(permissions.PermissionBreach):
+        agents.execute(run, phase(), call())
+
+    assert protected.read_text() == "operator-version\n"
+    assert (
+        subprocess.run(
+            ["git", "show", ":protected.txt"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        == "staged user value\n"
+    )
 
 
 def test_timeout_propagates_and_records_error(monkeypatch, tmp_path: Path):

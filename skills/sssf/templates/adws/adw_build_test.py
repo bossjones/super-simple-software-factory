@@ -35,45 +35,79 @@ REQUIRED_AGENTS = ["builder"]
 MAX_FIX_LOOPS = 3
 
 
-def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None) -> int:
+def main(
+    prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None
+) -> int:
     cfg = agents.load_config(config)
     agents.validate(cfg, REQUIRED_AGENTS)
     run = session.ensure(cfg, adw_id)
 
     def record(ph, result) -> None:
         passed = sum(1 for check in result.checks if check.passed)
-        ph.log(passed=result.passed, checks=f"{passed}/{len(result.checks)}",
-               artifacts=", ".join(result.artifacts))
+        ph.log(
+            passed=result.passed,
+            checks=f"{passed}/{len(result.checks)}",
+            artifacts=", ".join(result.artifacts),
+        )
 
-    with run.phase(PhaseParams(name="request", kind="engineer", owner=run.engineer,
-                               description="Capture the incoming ask")) as ph:
+    with run.phase(
+        PhaseParams(
+            name="request",
+            kind="engineer",
+            owner=run.engineer,
+            description="Capture the incoming ask",
+        )
+    ) as ph:
         ph.log(input=prompt)
 
-    with run.phase(PhaseParams(name="build", kind="agent", owner="builder",
-                               description="Implement the request")) as ph:
-        previous = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt,
-                                     gates=[gates.diff_matches_claims]))
+    with run.phase(
+        PhaseParams(
+            name="build", kind="agent", owner="builder", description="Implement the request"
+        )
+    ) as ph:
+        ph.call(
+            AgentCall(output_type=BuildOutput, prompt=prompt, gates=[gates.diff_matches_claims])
+        )
 
     test = None
     for i in range(1, MAX_FIX_LOOPS + 1):
-        with run.phase(PhaseParams(name=f"test_{i}", kind="code", owner="quality",
-                                   description="Run the suite — a known command, so code runs "
-                                               "it and no agent has to rediscover it")) as ph:
+        with run.phase(
+            PhaseParams(
+                name=f"test_{i}",
+                kind="code",
+                owner="quality",
+                description="Run the suite — a known command, so code runs "
+                "it and no agent has to rediscover it",
+            )
+        ) as ph:
             test = quality.run_tests(run)
             record(ph, test)
 
         if test.passed:
             break
 
-        with run.phase(PhaseParams(name=f"fix_{i}", kind="agent", owner="builder", retries=1,
-                                   description="Repair what the suite reported, from its "
-                                               "verbatim output")) as ph:
-            previous = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt,
-                                         previous=quality.as_envelope(test, "tests"),
-                                         gates=[gates.diff_matches_claims]))
+        with run.phase(
+            PhaseParams(
+                name=f"fix_{i}",
+                kind="agent",
+                owner="builder",
+                retries=1,
+                description="Repair what the suite reported, from its verbatim output",
+            )
+        ) as ph:
+            ph.call(
+                AgentCall(
+                    output_type=BuildOutput,
+                    prompt=prompt,
+                    previous=quality.as_envelope(test, "tests"),
+                    gates=[gates.diff_matches_claims],
+                )
+            )
 
-    return run.finish(accepted=test is not None and test.passed,
-                      reason=f"the suite still failed after {MAX_FIX_LOOPS} fix attempt(s)")
+    return run.finish(
+        accepted=test is not None and test.passed,
+        reason=f"the suite still failed after {MAX_FIX_LOOPS} fix attempt(s)",
+    )
 
 
 if __name__ == "__main__":

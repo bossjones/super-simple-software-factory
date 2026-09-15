@@ -500,7 +500,10 @@ class AgentConfig(BaseModel):
     color: str = ""
     purpose: str = ""
     prompt_engineering: PromptEngineering
-    tools: Optional[list[str]] = None
+    tools: list[str] = Field(
+        default_factory=lambda: ["view", "rg", "glob", "bash", "apply_patch"],
+        min_length=1,
+    )
     skill_directories: list[str] = Field(default_factory=list)
     plugin_directories: list[str] = Field(default_factory=list)
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
@@ -531,7 +534,7 @@ class AgentRequest(BaseModel):
     resume: bool = False
     runtime_dir: str
     raw_output_path: str
-    tools: Optional[list[str]] = None
+    tools: list[str] = Field(min_length=1)
     skill_directories: list[str] = Field(default_factory=list)
     plugin_directories: list[str] = Field(default_factory=list)
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)

@@ -25,21 +25,38 @@ from adw_modules.data_types import PhaseParams
 REQUIRED_AGENTS: list[str] = []
 
 
-def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None) -> int:
+def main(
+    prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None
+) -> int:
     cfg = agents.load_config(config)
     agents.validate(cfg, REQUIRED_AGENTS)
     run = session.ensure(cfg, adw_id)
 
-    with run.phase(PhaseParams(name="request", kind="engineer", owner=run.engineer,
-                               description="Capture why quality verification was requested")) as ph:
+    with run.phase(
+        PhaseParams(
+            name="request",
+            kind="engineer",
+            owner=run.engineer,
+            description="Capture why quality verification was requested",
+        )
+    ) as ph:
         ph.log(input=prompt)
 
-    with run.phase(PhaseParams(name="quality", kind="code", owner="quality",
-                               description="Run the deterministic quality blocks")) as ph:
+    with run.phase(
+        PhaseParams(
+            name="quality",
+            kind="code",
+            owner="quality",
+            description="Run the deterministic quality blocks",
+        )
+    ) as ph:
         result = quality.run_quality(run)
         passed = sum(1 for check in result.checks if check.passed)
-        ph.log(passed=result.passed, checks=f"{passed}/{len(result.checks)}",
-               artifacts=", ".join(result.artifacts))
+        ph.log(
+            passed=result.passed,
+            checks=f"{passed}/{len(result.checks)}",
+            artifacts=", ".join(result.artifacts),
+        )
         if not result.passed:
             raise RuntimeError("quality failed: " + "; ".join(result.failures))
 
