@@ -7,73 +7,88 @@ metadata:
   version: "1.0.0"
 ---
 
-# Super Simple Software Factory (SSSF)
+# Super Simple Software Factory
 
-Reusable combination of **agents plus code**: deterministic Python ADW scripts own sequencing, retries, and acceptance; coding agents (Pi in v1) work inside bounded phases; typed JSON envelopes carry context between them; everything streams into SQLite for the polled visualizer. Agent proposes, code disposes.
+SSSF combines deterministic Python ADWs with bounded GitHub Copilot agent
+sessions. ADWs own sequencing, retries, gates, permissions, evidence, and
+acceptance. Copilot proposes; deterministic code disposes.
 
 ## Startup
 
-Three steps. Then stop.
-
-1. Read [cookbooks/sssf_overview.md](cookbooks/sssf_overview.md) — the system map.
-2. `ls adws/adw_*.py` and read each file's `Phases:` docstring line.
-3. Print the ADWs as a table — name, the chain, one line on when to reach for it — and **wait for the engineer's request.**
-
-```
-| ADW | Chain | Use when |
-|---|---|---|
-| adw_scout | engineer → scout | read-only recon; nothing changes |
-| adw_simple_sdlc | plan → build → test → review → document, 3 commits | the work is real and its shape is not obvious |
-```
-
-**Nothing else.** No trace-db queries, no reading the config or the ADW scripts' bodies, no repo inventory, no last-runs summary, no diagnosing an old failure, no "current state" dashboard. None of it was asked for, and it is not free:
-
-- **Volunteered state is guessed state.** An orchestrator that improvised a status board queried a `runs` table and a `payload` column — neither exists (`sessions`, `payload_json`). The spec that would have said so is `references/observability.md`, one lazy read away. Probing to look prepared is how you end up confidently wrong in your first message.
-- **It spends the context the real task needs**, before you know what the task is.
-- **It is stale on arrival.** State printed before the request describes a system that the very next run changes.
-
-Everything else — the db schema, the roster, the handoff contract — is lazy-loaded through the routing table below, when a request actually calls for it. Reading it early defeats the mechanism.
-
-Two exceptions, both narrow: if the engineer's first message already contains a request, skip the waiting and route it; and if the factory is plainly not installed (no `adws/`, no config), say that in one line instead of the table.
-
-## Orchestrator rules
-
-You run the system, observe the system, and help the user interact with it. **You do no ADW work yourself:**
-
-- Never implement, plan, or test in an agent's place — launch the ADW and watch it.
-- Never edit files inside `adws/adw_data/sessions/` — that is the run record.
-- Observe by querying `adws/adw_data/sssf.db` (WAL — reads never block writers) **when observing is the task**. This is a capability, not a startup step: query it to follow a run you launched or one the engineer asked about, never to volunteer a status report nobody requested.
-- Report phase status plainly: name, owner, status, error if any.
-
-## Request routing (lazy-load the cookbook, then follow it)
+Read [cookbooks/sssf_overview.md](cookbooks/sssf_overview.md). If this is an
+installation request, load [cookbooks/install.md](cookbooks/install.md).
+Otherwise route the request through the table below and load only the
+referenced cookbook.
 
 | Request | Cookbook |
 |---|---|
-| `/sssf install`, set up the factory in this repo | [cookbooks/install.md](cookbooks/install.md) |
-| create a new ADW / workflow | [cookbooks/create_adw.md](cookbooks/create_adw.md) |
-| modify an existing ADW chain | [cookbooks/update_adw.md](cookbooks/update_adw.md) |
-| create the config / agent roster | [cookbooks/create_config.md](cookbooks/create_config.md) |
-| add or retune an agent (model, thinking, tools, prompts) | [cookbooks/update_config.md](cookbooks/update_config.md) |
-| extend adw_modules with new low-level logic | [cookbooks/update_modules.md](cookbooks/update_modules.md) |
-| run / monitor an ADW | [cookbooks/how_to_prompt_for_the_eng.md](cookbooks/how_to_prompt_for_the_eng.md) **first**, then [cookbooks/run_adw.md](cookbooks/run_adw.md) |
+| install the factory | [cookbooks/install.md](cookbooks/install.md) |
+| create an ADW | [cookbooks/create_adw.md](cookbooks/create_adw.md) |
+| change an ADW chain | [cookbooks/update_adw.md](cookbooks/update_adw.md) |
+| create the roster | [cookbooks/create_config.md](cookbooks/create_config.md) |
+| tune an agent | [cookbooks/update_config.md](cookbooks/update_config.md) |
+| extend deterministic modules | [cookbooks/update_modules.md](cookbooks/update_modules.md) |
 | turn a request into an ADW prompt | [cookbooks/how_to_prompt_for_the_eng.md](cookbooks/how_to_prompt_for_the_eng.md) |
+| run or observe an ADW | [cookbooks/run_adw.md](cookbooks/run_adw.md) |
 
-Deep specs, when needed: [references/config.md](references/config.md) · [references/handoff.md](references/handoff.md) · [references/observability.md](references/observability.md)
+Deep contracts are lazy-loaded from
+[references/config.md](references/config.md),
+[references/handoff.md](references/handoff.md), and
+[references/observability.md](references/observability.md).
 
-## Hard rules (enforced across everything the factory generates)
+## Non-negotiable operating rules
 
-1. **Validate before running** — every ADW declares `REQUIRED_AGENTS` and calls `agents.validate()` first; a missing/misnamed agent fails before anything spawns.
-2. **Typed outputs only** — every agent call pairs with a concrete `EnvelopeBase` subclass in `adw_modules/data_types.py`; parse failures re-prompt the same session (context intact), never restart.
-   **The output contract is a synced triad**: (a) the type in `data_types.py`, (b) the JSON example in the agent's `user.md` `## Report` section, (c) `output_type=` at every call site. These are ONE contract — change any one, update all three in the same edit (grep the type name to find every call site).
-3. **Gates validate claims, not guesses** — `gate(envelope, run) -> list[str]` violations; failures return to the same session as corrections.
-4. **Four-param rule** — any function with more than 4 parameters takes one concrete data type instead (`AgentCall`, `PhaseParams` are the pattern).
-5. **One agent, one prompt, one purpose** — identity lives in `system.md`; task shape (user prompt + output type) lives at the call site.
-6. **ADW scripts stay thin** — all low-level logic lives in `adw_modules/`.
-7. **Every phase earns a description** — one sentence on what it does and why, never a restatement of its name. It is the only intent the trace, the console, and the UI ever show; `commit_plan: "Commit the plan"` is rejected at construction, blank is too.
-8. **A known command is code, not an agent** — if you can write the invocation down (`bun test`, `ruff check`), it belongs in a `kind="code"` phase via `adw_modules/quality.py`. Agents are for the parts that need reading and deciding; failures come back to the builder as an envelope either way.
-9. **`tools:` is a capability list, `writes:` is the boundary** — `bash` runs anything (including `git checkout`) and `write` reaches any path, so a tool list can never make "this agent changes nothing" true. `writes:` per agent and `protected_files` in defaults are enforced in `adw_modules/permissions.py` after every agent call: unauthorized changes are rolled back and the phase dies. The session runtime under `data_dir` is always writable — a read-only agent is read-only with respect to the REPO, never mute.
-10. **Every ADW ends in `run.finish()`** — phases passing is not the same as the run being accepted. A test phase that ran a red suite succeeded at its job. Pass `accepted=` so the exit code, the session status, and the banner are decided together and cannot disagree.
+1. Validate the roster and Copilot SDK/runtime before an agent phase starts.
+2. Give every agent call a concrete typed envelope and a matching JSON report.
+3. Keep malformed-output and gate corrections in the same Copilot session.
+4. Use deterministic code phases for known commands, tests, commits, and
+   migrations.
+5. Treat `writes` and protected paths as the repository policy boundary.
+6. Subscribe to Copilot events during session creation/resume; normalize them
+   before they enter the SSSF trace.
+7. Treat `session.idle` as mechanical completion. A wait timeout is not an
+   abort; call `session.abort()` on a deadline.
+8. Disconnect to preserve resumable state. Never silently create a replacement
+   after resume failure.
+9. End every ADW with `run.finish(accepted=...)`.
+10. Never place credentials in prompts, checked-in configuration, subprocess
+    arguments, or raw/SQLite traces. A local ignored `.env` may hold one
+    supported token when CLI login is unavailable.
 
-## v1 scope
+## Canonical package layout
 
-Pi coding agent only (`coding_agent: pi`), default model `gemini-3.6-flash` via openrouter, thinking `medium`. `claude_code` is schema-valid but stubbed until v2. The visualizer app ships in a later pass — observe via sqlite queries until then.
+The plugin root contains `plugin.json` and the canonical skill at
+`skills/sssf/SKILL.md`. Its scripts, cookbooks, references, and templates are
+all relative to `skills/sssf/`. In a stamped target repository, generated
+runtime files live under `adws/` and runtime state under
+`adws/adw_data/`.
+
+## Copilot-first operation
+
+For local plugin development use:
+
+```bash
+copilot --no-auto-update --plugin-dir . plugin list --json
+```
+
+The plugin listing is the required discovery check. `skill list --json` is
+optional and version-dependent; a plugin-provided skill may not appear there.
+The official Python SDK is the only agent execution integration. Use
+`copilot --version`, then run both SDK checks with the pinned package:
+
+```bash
+copilot --version
+uv run --with github-copilot-sdk==1.0.13 python -c \
+  "import importlib.metadata as m; print(m.version('github-copilot-sdk'))"
+uv run --with github-copilot-sdk==1.0.13 python -m copilot download-runtime
+```
+
+Read the official
+[Python SDK README](https://github.com/github/copilot-sdk/blob/main/python/README.md)
+when lifecycle behavior is version-sensitive.
+
+The [Agent Skills specification](https://agentskills.io/specification),
+[Copilot plugin documentation](https://docs.github.com/en/copilot/concepts/agents/about-plugins),
+and [MCP documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers)
+define packaging and tool-extension behavior. These controls complement, but
+do not replace, SSSF's deterministic write-policy enforcement.

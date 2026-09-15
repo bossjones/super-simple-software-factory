@@ -1,56 +1,83 @@
 # Install
 
-`/sssf install` — stamp the entire factory out of the skill and into the current working directory.
+## Plugin discovery
 
-## Run it
-
-```bash
-uv run .claude/skills/sssf/scripts/install.py
-```
-
-Run from the **target repo root** — the cwd is where everything lands. If the skill lives in your user scope, the path is `~/.claude/skills/sssf/scripts/install.py`.
-
-## What gets stamped
-
-`install.py` copies `templates/` into the cwd:
-
-| Stamped | From | Tracked? |
-|---|---|---|
-| `adws/adw_sssf_config/sssf.config.yaml` | `templates/sssf.config.yaml` | yes — the agent roster |
-| `.env.sample` | `templates/env.sample` | yes |
-| `adws/adw_*.py` | `templates/adws/` | yes — the twelve starter ADWs |
-| `adws/adw_modules/` | `templates/adws/adw_modules/` | yes — all low-level logic |
-| `adws/adw_data/prompt_engineering/{planner,builder,scout,reviewer,documenter}/` | `templates/prompt_engineering/` | yes — **the user-owned home for prompts** |
-| `adws/adw_data/harness_engineering/` | `templates/harness_engineering/` | yes — **the user-owned home for pi extensions** |
-| `justfile` | `templates/justfile` | yes — starter recipes: `just demo`, the workflows, the trace reads, `just obs` |
-| `adws/adw_data/sessions/`, `adws/adw_data/sssf.db` | created at runtime | no — gitignored |
-
-The two `*_engineering` dirs mirror the two config keys of the same name: `prompt_engineering` is what an agent is told, `harness_engineering` is what its harness can do. Both are yours the moment they are stamped. Edit them in `adws/adw_data/`, never back inside the skill.
-
-`harness_engineering/` ships with `subagents.ts` — the pi extension backing `subagent_create` / `_continue` / `_list` / `_remove`, wired to the planner and scout in the starter roster.
-
-## Idempotency
-
-Re-running is safe. `install.py` skips **every** file that already exists — your config, your prompts, and previously stamped code alike — and reports what it skipped, so a second run doubles as a drift check. To refresh stamped code (`adw_modules/`, the starter `adw_*.py`) to the skill's current version, run with `--force` — but know that `--force` overwrites ALL existing stamped files, including `sssf.config.yaml` and `prompt_engineering/`, so commit or back up user-owned edits first.
-
-## Post-install checklist
-
-1. **Env** — `cp .env.sample .env`, then set `OPENROUTER_API_KEY` in `.env`. (v1 runs Pi; `ANTHROPIC_API_KEY` / `CLAUDE_CODE_PATH` are only needed once Claude Code lands in v2.)
-2. **Pi is installed and on PATH** — `pi --version`. Set `PI_PATH` in `.env` if it is not.
-3. **The model resolves** — the config's default `gemini-3.6-flash` must be a registered id in `~/.pi/agent/models.json`. Check with `pi --list-models` or read the file directly; see `references/config.md` for model resolution.
-4. **Gitignore** — `install.py` appends `adws/adw_data/sessions/`, `adws/adw_data/sssf.db*`, and `.env` for you; confirm they landed. All three are runtime or secrets and must never be committed.
-5. **Git repo** — ADWs that end in a commit phase call `git_helper.commit_all`, which raises if the cwd is not a git repository. Run `git init` and make a first commit before using `adw_plan_build.py`, `adw_plan_build_test.py`, or `adw_simple_sdlc.py`. `adw_document.py` needs one too: it measures the change with `git diff` against a base ref (`main` by default, `--base` to override).
-6. **Smoke test** — `just demo` runs two cheap read-only workflows back to back, or run the smallest ADW directly:
+Install from the plugin marketplace when available. This makes the skill
+discoverable to Copilot; it does not stamp a target repository or provide the
+installer path there:
 
 ```bash
-just demo                                                    # both, end to end
-uv run adws/adw_prompt.py "reply with a one-line summary of this repo"   # the raw form
+copilot plugin install bossjones/super-simple-software-factory
 ```
 
-Green means the whole path works: config validated, session minted, Pi ran, envelope parsed, events landed in `adws/adw_data/sssf.db`. Verify the trace exists before trusting anything larger:
+The required discovery evidence is:
 
 ```bash
-sqlite3 adws/adw_data/sssf.db "select adw_id, status from sessions order by started_at desc limit 1;"
+copilot plugin list --json
 ```
 
-If the smoke test fails, fix it before composing chains — every multi-agent ADW rides on this exact path.
+`copilot skill list` is optional and version-dependent. A plugin-provided skill
+may not appear in that output.
+
+## Stamp a target repository
+
+Locate or clone a separate SSSF checkout:
+
+```bash
+git clone https://github.com/bossjones/super-simple-software-factory.git \
+  "$HOME/src/super-simple-software-factory"
+```
+
+Run its installer from the target repository root:
+
+```bash
+uv run "$HOME/src/super-simple-software-factory/skills/sssf/scripts/install.py"
+```
+
+When the target is the checkout itself, use the relative path:
+
+```bash
+uv run skills/sssf/scripts/install.py
+```
+
+For local plugin development, validate the separate checkout without
+installing it:
+
+```bash
+copilot --no-auto-update --plugin-dir /path/to/super-simple-software-factory plugin list --json
+```
+
+The installer creates `adws/`, `.env.sample`, `justfile`, prompt/runtime
+templates, and ignored session/trace directories. It skips existing files.
+Use `--force` only after backing up local configuration; it overwrites stamped
+files.
+
+## Preflight
+
+Install/authenticate the prerequisites, then check the SDK/runtime:
+
+```bash
+copilot login
+copilot --version
+uv run --with github-copilot-sdk==1.0.13 python -c \
+  "import importlib.metadata as m; print(m.version('github-copilot-sdk'))"
+uv run --with github-copilot-sdk==1.0.13 python -m copilot download-runtime
+```
+
+CLI login is preferred. The local ignored `.env` is also an accepted token
+store for the variables in `.env.sample`; never commit `.env` or put tokens in
+prompts or CLI arguments.
+Python 3.11+, `uv`, Git, `sqlite3`, and `just` are required; Bun is optional.
+
+## Smoke test
+
+```bash
+just demo
+just sessions
+```
+
+The stamped target's supported observation commands are `just sessions`,
+`just phases <adw_id>`, `just tail <adw_id>`, and `just procs <adw_id>`. The
+installer does not stamp the optional visualizer, so there is no target-local
+visualizer command to document here. If the smoke test fails, inspect the
+phase and trace before composing a multi-agent chain.
