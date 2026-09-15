@@ -26,6 +26,3 @@ events, prompts, envelopes, and `agent_map.json` live under
 If a run is stuck, inspect the process rows and use the repository's kill
 helper. A timeout aborts active Copilot work before cleanup; a failed resume is
 reported rather than replaced.
-
-For a walked-through first run, including what a same-session correction
-looks like, see [../../../docs/tutorial.md](../../../docs/tutorial.md).

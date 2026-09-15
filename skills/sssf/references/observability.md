@@ -77,7 +77,3 @@ gate therefore remains explainable.
 Authoritative event behavior is documented in the [SDK streaming
 guide](https://github.com/github/copilot-sdk/blob/main/docs/features/streaming-events.md)
 and [Python session source](https://github.com/github/copilot-sdk/blob/main/python/copilot/session.py).
-
-For a hands-on run of `just sessions`/`phases`/`tail` and a direct SQLite
-query against a real trace, see
-[../../../docs/tutorial.md](../../../docs/tutorial.md).
