@@ -11,7 +11,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from .data_types import AgentConfig, EventRecord, GateReport, Phase
+from .data_types import AgentConfig, EventRecord, GateReport, Phase, RuntimeInfo
 from .utils import ensure_dir, new_id, now_iso
 
 SCHEMA = """
@@ -84,6 +84,10 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
   session_id    TEXT,
   context_tokens INTEGER,           -- window occupancy after the agent's last turn
   context_window INTEGER,           -- the model's ceiling; 0/NULL = unknown
+  sdk_version   TEXT,
+  runtime_version TEXT,
+  protocol_version TEXT,
+  cli_version   TEXT,
   created_at    TEXT, last_used_at TEXT,
   PRIMARY KEY (adw_id, agent)
 );
@@ -96,6 +100,10 @@ MIGRATIONS = [("agent_sessions", "color", "TEXT"),
               ("sessions", "adw_name", "TEXT"),
               ("agent_sessions", "context_tokens", "INTEGER"),
               ("agent_sessions", "context_window", "INTEGER"),
+              ("agent_sessions", "sdk_version", "TEXT"),
+              ("agent_sessions", "runtime_version", "TEXT"),
+              ("agent_sessions", "protocol_version", "TEXT"),
+              ("agent_sessions", "cli_version", "TEXT"),
               ("sessions", "archived", "INTEGER DEFAULT 0")]
 
 
@@ -249,7 +257,8 @@ class Tracer:
         )
 
     def agent_session_row(self, adw_id: str, agent: AgentConfig, session_id: str,
-                          context_tokens: int = 0, context_window: int = 0) -> None:
+                          context_tokens: int = 0, context_window: int = 0,
+                          runtime: RuntimeInfo | None = None) -> None:
         """The agent's config row is the source of truth for its label and color.
 
         Context is carried here rather than derived from events because the lane
@@ -257,15 +266,26 @@ class Tracer:
         same agent twice overwrites it, exactly like model and session_id.
         """
         ts = now_iso()
+        runtime_values = (
+            runtime.sdk_version,
+            runtime.runtime_version,
+            runtime.protocol_version,
+            runtime.cli_version,
+        ) if runtime else (None, None, None, None)
         self.conn.execute(
             "INSERT INTO agent_sessions (adw_id, agent, coding_agent, model, color,"
-            " session_id, context_tokens, context_window, created_at, last_used_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)"
+            " session_id, context_tokens, context_window, sdk_version, runtime_version,"
+            " protocol_version, cli_version, created_at, last_used_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(adw_id, agent) DO UPDATE SET model=excluded.model,"
             " color=excluded.color, session_id=excluded.session_id,"
             " context_tokens=excluded.context_tokens,"
             " context_window=excluded.context_window,"
+            " sdk_version=excluded.sdk_version,"
+            " runtime_version=excluded.runtime_version,"
+            " protocol_version=excluded.protocol_version,"
+            " cli_version=excluded.cli_version,"
             " last_used_at=excluded.last_used_at",
-            (adw_id, agent.name, agent.coding_agent, agent.model, agent.color,
-             session_id, context_tokens, context_window, ts, ts),
+            (adw_id, agent.name, "copilot", agent.model, agent.color,
+             session_id, context_tokens, context_window, *runtime_values, ts, ts),
         )

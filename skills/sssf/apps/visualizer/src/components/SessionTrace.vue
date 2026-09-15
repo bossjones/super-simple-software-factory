@@ -93,6 +93,12 @@ const selectedPhase = computed(
   () => phases.value.find((p) => p.phase_id === props.phaseId) ?? null,
 )
 
+const selectedAgent = computed(() => {
+  if (selectedPhase.value?.kind !== 'agent') return null
+  const owner = selectedPhase.value?.owner
+  return owner ? agents.value.find((agent) => agent.agent === owner) ?? null : null
+})
+
 watchEffect(() => {
   phaseCrumb.value = selectedPhase.value?.name ?? null
 })
@@ -552,6 +558,7 @@ function selectPhase(p: Phase) {
       :events="events"
       :envelopes="envelopes"
       :gates="gates"
+      :agent-session="selectedAgent"
       @close="navigate(props.adwId)"
     />
   </div>

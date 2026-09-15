@@ -152,6 +152,11 @@ export interface AgentSession {
    */
   context_tokens: number | null;
   context_window: number | null;
+  /** Copilot runtime metadata; null on rows written before these columns existed. */
+  sdk_version: string | null;
+  runtime_version: string | null;
+  protocol_version: string | null;
+  cli_version: string | null;
   created_at: string | null;
   last_used_at: string | null;
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import type {
+  AgentSession,
   AgentEndPayload,
   Envelope,
   EventRow,
@@ -37,6 +38,7 @@ const props = defineProps<{
   events: EventRow[]
   envelopes: Envelope[]
   gates: GateResult[]
+  agentSession?: AgentSession | null
 }>()
 
 defineEmits<{ close: [] }>()
@@ -64,6 +66,18 @@ const agentConfig = computed(() => {
   const start = phaseEvents.value.find((e) => e.type === 'agent_start')
   return start ? parseAgentStart(start) : null
 })
+
+const agentHarness = computed(() => {
+  const harness = agentConfig.value?.coding_agent ?? props.agentSession?.coding_agent
+  return harness ? harness.charAt(0).toUpperCase() + harness.slice(1) : null
+})
+
+const runtimeMetadata = computed(() => [
+  { label: 'sdk', value: props.agentSession?.sdk_version ?? null },
+  { label: 'runtime', value: props.agentSession?.runtime_version ?? null },
+  { label: 'protocol', value: props.agentSession?.protocol_version ?? null },
+  { label: 'cli', value: props.agentSession?.cli_version ?? null },
+])
 
 interface UsageRow {
   label: string
@@ -382,59 +396,65 @@ function togglePanel(id: string) {
         </DetailSection>
 
         <DetailSection
-          v-if="agentConfig"
+          v-if="agentConfig || agentSession"
           title="agent config"
           :icon="SlidersHorizontal"
           :open="openSections.has('config')"
           @toggle="toggleSection('config')"
         >
           <div class="cfg">
-            <div v-if="agentConfig.coding_agent" class="cfg-row">
-              <span class="cfg-k">coding agent</span>
+            <div v-if="agentHarness" class="cfg-row">
+              <span class="cfg-k">harness</span>
               <span class="cfg-chip">
                 <SquareTerminal class="cfg-icon" :size="18" :stroke-width="2" />
-                {{ agentConfig.coding_agent }}
+                {{ agentHarness }}
               </span>
             </div>
-            <div v-if="agentConfig.model" class="cfg-row">
+            <div v-if="agentConfig?.model" class="cfg-row">
               <span class="cfg-k">model</span>
               <span class="cfg-chip" :title="agentConfig.model">
                 <img v-if="modelIcon(agentConfig.model)" class="cfg-model-icon" :src="modelIcon(agentConfig.model)!" alt="" />
                 {{ modelName(agentConfig.model) }}
               </span>
             </div>
-            <div v-if="agentConfig.thinking" class="cfg-row">
+            <div v-if="agentConfig?.thinking" class="cfg-row">
               <span class="cfg-k">thinking</span>
               <span class="cfg-chip">
                 <Brain class="cfg-icon" :size="18" :stroke-width="2" />
                 {{ agentConfig.thinking }}
               </span>
             </div>
-            <div v-if="agentConfig.tools !== undefined" class="cfg-row">
+            <div v-if="agentConfig?.tools !== undefined" class="cfg-row">
               <span class="cfg-k">tools</span>
               <span v-if="agentConfig.tools === null" class="cfg-v">all tools</span>
               <span v-else class="cfg-chips">
                 <span v-for="t in agentConfig.tools" :key="t" class="cfg-chip">{{ t }}</span>
               </span>
             </div>
-            <div v-if="agentConfig.harness_engineering !== undefined" class="cfg-row">
-              <span class="cfg-k">harness</span>
+            <div v-if="agentConfig?.harness_engineering !== undefined" class="cfg-row">
+              <span class="cfg-k">harness engineering</span>
               <span v-if="!agentConfig.harness_engineering?.length" class="cfg-v dim">none</span>
               <span v-else class="cfg-chips">
                 <span v-for="h in agentConfig.harness_engineering" :key="h" class="cfg-chip">{{ h }}</span>
               </span>
             </div>
-            <div v-if="agentConfig.purpose" class="cfg-row">
+            <div v-if="agentConfig?.purpose" class="cfg-row">
               <span class="cfg-k">purpose</span>
               <span class="cfg-v">{{ agentConfig.purpose }}</span>
             </div>
-            <div v-if="agentConfig.session_id" class="cfg-row">
+            <div v-if="agentConfig?.session_id" class="cfg-row">
               <span class="cfg-k">session</span>
               <span class="cfg-chip">
                 <Fingerprint class="cfg-icon" :size="18" :stroke-width="2" />
                 {{ agentConfig.session_id }}
               </span>
             </div>
+            <template v-for="metadata in runtimeMetadata" :key="metadata.label">
+              <div v-if="metadata.value" class="cfg-row">
+                <span class="cfg-k">{{ metadata.label }}</span>
+                <span class="cfg-v mono">{{ metadata.value }}</span>
+              </div>
+            </template>
           </div>
         </DetailSection>
 

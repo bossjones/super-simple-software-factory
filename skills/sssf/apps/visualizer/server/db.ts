@@ -252,11 +252,16 @@ export class SssfDb {
     const color = this.optionalColumn("agent_sessions", "color");
     const ctxUsed = this.optionalColumn("agent_sessions", "context_tokens");
     const ctxWindow = this.optionalColumn("agent_sessions", "context_window");
+    const sdkVersion = this.optionalColumn("agent_sessions", "sdk_version");
+    const runtimeVersion = this.optionalColumn("agent_sessions", "runtime_version");
+    const protocolVersion = this.optionalColumn("agent_sessions", "protocol_version");
+    const cliVersion = this.optionalColumn("agent_sessions", "cli_version");
 
     const completed = this.db
       .query<AgentSession, string[]>(
         `SELECT adw_id, agent, coding_agent, model, session_id, ${color},
-                ${ctxUsed}, ${ctxWindow}, created_at, last_used_at
+                ${ctxUsed}, ${ctxWindow}, ${sdkVersion}, ${runtimeVersion},
+                ${protocolVersion}, ${cliVersion}, created_at, last_used_at
            FROM agent_sessions WHERE adw_id IN (${placeholders})
           ORDER BY created_at, agent`,
       )
@@ -300,6 +305,10 @@ export class SssfDb {
         // Occupancy is only known once the agent's turn closes.
         context_tokens: null,
         context_window: null,
+        sdk_version: null,
+        runtime_version: null,
+        protocol_version: null,
+        cli_version: null,
         created_at: row.started_at,
         last_used_at: row.started_at,
       });
