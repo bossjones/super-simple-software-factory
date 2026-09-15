@@ -9,6 +9,10 @@ The repository is an Agent Plugins 1.0 package. The distributable skill lives
 at `skills/sssf/`; that is the canonical path for scripts, cookbooks,
 references, templates, and the generated runtime.
 
+New to SSSF? [docs/tutorial.md](docs/tutorial.md) is a guided, first-time
+walkthrough from preflight through a traced run and cleanup, using the exact
+commands below in order.
+
 ## Requirements
 
 - Python 3.11+

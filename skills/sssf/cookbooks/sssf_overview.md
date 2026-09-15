@@ -36,3 +36,6 @@ the mechanical completion signal; deadline handling calls `abort()`.
 Read [references/config.md](../references/config.md) for the roster,
 [references/handoff.md](../references/handoff.md) for envelopes and sessions,
 and [references/observability.md](../references/observability.md) for SQLite.
+
+First time here? [../../../docs/tutorial.md](../../../docs/tutorial.md) walks
+through this shape end to end against a disposable target repository.

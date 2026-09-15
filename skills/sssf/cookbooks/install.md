@@ -1,5 +1,9 @@
 # Install
 
+For a guided first-time walkthrough of this whole page — including a safe
+disposable target repository, auth, and the read-only smoke test — see
+[../../../docs/tutorial.md](../../../docs/tutorial.md).
+
 ## Plugin discovery
 
 Install from the plugin marketplace when available. This makes the skill
