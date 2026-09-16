@@ -144,20 +144,24 @@ For **published-plugin discovery** (no local checkout involved):
 
 ```bash
 copilot plugin install bossjones/super-simple-software-factory
-copilot plugin list --json   # required discovery evidence
+copilot plugin list   # required discovery evidence
 ```
 
 For **local plugin development** — validating *this* checkout without
 installing it — run from the repository root:
 
 ```bash
-copilot --no-auto-update --plugin-dir . plugin list --json
+copilot --no-auto-update --plugin-dir . plugin list
 ```
 
-The listing should show `sssf` as an enabled external plugin.
+The listing should show `sssf` as an enabled external plugin. The checkout
+also carries a tracked symlink `.agents/skills/sssf`, so `copilot skill list`
+run from the repository root shows `sssf` under project skills even without
+`--plugin-dir`; with the published plugin installed as well, the skill loads
+twice inside the checkout.
 `copilot skill list --json` is optional diagnostic output only: its
 contents, and whether a plugin-provided skill even appears in it, are
-CLI-version-dependent. `plugin list --json` is the check that actually
+CLI-version-dependent. `plugin list` is the check that actually
 matters. Neither command touches a target repository's files — that's what
 [Section 4](#4-install-into-a-safe-disposable-target-repository) does.
 
@@ -491,7 +495,7 @@ start the dev server or point at any target database.
 
 | Symptom | What's happening | What to do |
 |---|---|---|
-| `copilot: command not found`, or `plugin list --json` doesn't show `sssf` | Copilot CLI missing/unauthenticated, or the plugin dir wasn't passed | Install the Copilot CLI, then rerun `copilot --no-auto-update --plugin-dir . plugin list --json` from the checkout root; confirm `plugin.json` and `skills/sssf/SKILL.md` exist |
+| `copilot: command not found`, or `plugin list` doesn't show `sssf` | Copilot CLI missing/unauthenticated, or the plugin dir wasn't passed | Install the Copilot CLI, then rerun `copilot --no-auto-update --plugin-dir . plugin list` from the checkout root; confirm `plugin.json` and `skills/sssf/SKILL.md` exist |
 | Any ADW fails immediately with an auth/login error | No usable credential | Prefer `copilot login`; otherwise set exactly one of `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN` in a local `.env` (never commit it, never put it in a prompt or CLI argument) |
 | `just copilot-doctor` reports a version mismatch, or the runtime fails to download | SDK/CLI/managed-runtime combination is out of sync with the pinned `github-copilot-sdk==1.0.13` | Rerun both `uv run --with github-copilot-sdk==1.0.13 ...` commands verbatim; do not swap in a different SDK version without also updating docs/tests |
 | `bun: command not found`, or `just visualizer-build`/`bun install` fails | Bun is optional and only needed for the visualizer | Install Bun from [bun.sh](https://bun.sh/), or simply skip Section 9 — the rest of the factory (install, demo, workflows, `just sessions`/`phases`/`tail`) works without it |

@@ -61,7 +61,9 @@ Deep contracts are lazy-loaded from
 
 The plugin root contains `plugin.json` and the canonical skill at
 `skills/sssf/SKILL.md`. Its scripts, cookbooks, references, and templates are
-all relative to `skills/sssf/`. In a stamped target repository, generated
+all relative to `skills/sssf/`. A tracked symlink at `.agents/skills/sssf`
+exposes the same directory as a project skill in a plain checkout of the
+plugin repository. In a stamped target repository, generated
 runtime files live under `adws/` and runtime state under
 `adws/adw_data/`.
 
@@ -70,7 +72,7 @@ runtime files live under `adws/` and runtime state under
 For local plugin development use:
 
 ```bash
-copilot --no-auto-update --plugin-dir . plugin list --json
+copilot --no-auto-update --plugin-dir . plugin list
 ```
 
 The plugin listing is the required discovery check. `skill list --json` is

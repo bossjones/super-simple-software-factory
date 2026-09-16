@@ -100,19 +100,26 @@ Do not pass a local directory to `copilot plugin install`. Validate an
 uninstalled checkout with the CLI's plugin directory option instead:
 
 ```bash
-copilot --plugin-dir /path/to/super-simple-software-factory plugin list --json
+copilot --plugin-dir /path/to/super-simple-software-factory plugin list
 ```
 
 From this checkout, the equivalent commands are:
 
 ```bash
-copilot --no-auto-update --plugin-dir . plugin list --json
+copilot --no-auto-update --plugin-dir . plugin list
 ```
 
 The plugin listing should show `sssf` as an enabled external plugin. Optionally
 run `skill list --json` or invoke the skill; either result is
 CLI-version-dependent and plugin-provided skills may not appear in the list.
 Avoid enabling another active copy of the same skill while testing.
+
+This checkout also carries a tracked symlink `.agents/skills/sssf` that
+resolves to `skills/sssf/`, so `copilot skill list` run from the repository
+root lists `sssf` under project skills without `--plugin-dir`. If the
+published plugin is installed as well, Copilot loads the skill twice while
+working inside the checkout. Windows clones need `git config core.symlinks
+true` before checkout, otherwise the link is a plain text file.
 
 ## SDK and runtime preflight
 
@@ -208,7 +215,8 @@ before changing a roster.
 - `SKILL.md` follows the open [Agent Skills
   specification](https://agentskills.io/specification). Project skills are
   discovered from supported skill directories; SSSF's packaged skill is under
-  `skills/sssf/`.
+  `skills/sssf/`. A tracked symlink at `.agents/skills/sssf` points to that
+  directory so a plain checkout also exposes it as a project skill.
 - A plugin may bundle skills, agents, hooks, MCP, and LSP resources. The
   `plugin.json` manifest follows the [Agent Plugins 1.0
   specification](https://github.com/agentplugins/agent-plugins-spec/blob/main/spec/1.0.0.md).
@@ -293,11 +301,11 @@ model behavior, verify allowed writes and unauthorized-write rollback.
 Local plugin discovery:
 
 ```bash
-copilot --no-auto-update --plugin-dir . plugin list --json
+copilot --no-auto-update --plugin-dir . plugin list
 ```
 
 `skill list --json` is optional and version-dependent; plugin discovery is
-established by `plugin list --json`. The optional authenticated smoke path is
+established by `plugin list`. The optional authenticated smoke path is
 `just demo`. The stamped target's supported observation commands are
 `just sessions`, `just phases ID`, `just tail ID`, and `just procs ID`; the
 visualizer is not installed by the factory installer. For the factual basis

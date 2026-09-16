@@ -45,13 +45,13 @@
   <!-- source: the skill -->
   <g class="src">
     <rect x="40" y="96" width="330" height="392" rx="14" fill="#0F172A" stroke="#38BDF8" stroke-width="2.2"/>
-    <text filter="url(#ts3)" class="hd mono" x="64" y="132">.claude/skills/sssf/</text>
+    <text filter="url(#ts3)" class="hd mono" x="64" y="132">skills/sssf/</text>
     <text filter="url(#ts3)" class="tag mono" x="64" y="154">THE PRODUCT</text>
     <line x1="64" y1="170" x2="346" y2="170" stroke="#334155" stroke-width="1"/>
     <text filter="url(#ts3)" class="row mono" x="64" y="198">SKILL.md</text>
     <text filter="url(#ts3)" class="dim mono" x="200" y="198">rules + routing</text>
     <text filter="url(#ts3)" class="row mono" x="64" y="228">cookbooks/</text>
-    <text filter="url(#ts3)" class="dim mono" x="200" y="228">8 playbooks</text>
+    <text filter="url(#ts3)" class="dim mono" x="200" y="228">9 playbooks</text>
     <text filter="url(#ts3)" class="row mono" x="64" y="258">references/</text>
     <text filter="url(#ts3)" class="dim mono" x="200" y="258">3 deep specs</text>
     <text filter="url(#ts3)" class="row mono" x="64" y="288">scripts/</text>
@@ -59,9 +59,9 @@
     <text filter="url(#ts3)" class="row mono" x="64" y="318">templates/</text>
     <text filter="url(#ts3)" class="dim mono" x="200" y="318">what gets stamped</text>
     <line x1="64" y1="338" x2="346" y2="338" stroke="#334155" stroke-width="1"/>
-    <text filter="url(#ts3)" class="dim mono" x="64" y="366">6 starter ADWs</text>
-    <text filter="url(#ts3)" class="dim mono" x="64" y="392">13 adw_modules</text>
-    <text filter="url(#ts3)" class="dim mono" x="64" y="418">4 starter agents</text>
+    <text filter="url(#ts3)" class="dim mono" x="64" y="366">12 starter ADWs</text>
+    <text filter="url(#ts3)" class="dim mono" x="64" y="392">16 adw_modules</text>
+    <text filter="url(#ts3)" class="dim mono" x="64" y="418">5 starter agents</text>
     <text filter="url(#ts3)" class="dim mono" x="64" y="444">sssf.config.yaml</text>
     <text filter="url(#ts3)" class="dim mono" x="64" y="470">.env.sample</text>
   </g>
@@ -99,7 +99,7 @@
     <text filter="url(#ts3)" class="row mono" x="584" y="426">adws/adw_sssf_config/</text>
     <text filter="url(#ts3)" class="dim mono" x="790" y="426">planner builder</text>
     <text filter="url(#ts3)" class="row mono" x="584" y="450">adws/adw_*.py</text>
-    <text filter="url(#ts3)" class="dim mono" x="790" y="450">scout tester</text>
+    <text filter="url(#ts3)" class="dim mono" x="790" y="450">scout reviewer</text>
     <text filter="url(#ts3)" class="row mono" x="584" y="474">adws/adw_data/prompt_engineering/</text>
   </g>
 

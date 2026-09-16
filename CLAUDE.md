@@ -12,7 +12,7 @@ performs bounded agent work.
 | `just verify` | Run formatting checks, Ruff, Pyright, tests, plugin/skill validation, link checks, and visualizer build |
 | `uv run pytest -q tests/<file>.py` | Run the smallest relevant test target while developing |
 | `just copilot-smoke` | Run the credentialed create/resume SDK smoke locally; never add it to credential-free CI |
-| `copilot --no-auto-update --plugin-dir . plugin list --json` | Validate local plugin discovery |
+| `copilot --no-auto-update --plugin-dir . plugin list` | Validate local plugin discovery |
 
 ## Architecture
 

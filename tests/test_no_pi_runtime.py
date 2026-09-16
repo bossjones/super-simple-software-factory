@@ -46,7 +46,11 @@ def test_production_runtime_has_no_pi_coupling(repo_root: Path):
 
 def test_current_ai_docs_do_not_reference_removed_sssf_surfaces(repo_root: Path):
     offenders = []
-    for path in sorted((repo_root / "ai_docs").glob("*.md")):
+    current_docs = [
+        *sorted((repo_root / "ai_docs").glob("*.md")),
+        *sorted((repo_root / "images").glob("*.svg")),
+    ]
+    for path in current_docs:
         text = path.read_text()
         if "historical: true" in text:
             continue

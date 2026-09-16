@@ -13,7 +13,7 @@ copilot plugin install bossjones/super-simple-software-factory
 The required discovery evidence is:
 
 ```bash
-copilot plugin list --json
+copilot plugin list
 ```
 
 `copilot skill list` is optional and version-dependent. A plugin-provided skill
@@ -44,7 +44,7 @@ For local plugin development, validate the separate checkout without
 installing it:
 
 ```bash
-copilot --no-auto-update --plugin-dir /path/to/super-simple-software-factory plugin list --json
+copilot --no-auto-update --plugin-dir /path/to/super-simple-software-factory plugin list
 ```
 
 The installer creates `adws/`, `.env.sample`, `justfile`, and prompt/runtime

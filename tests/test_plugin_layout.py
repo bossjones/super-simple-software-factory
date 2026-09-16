@@ -84,3 +84,11 @@ def test_canonical_skill_resources_exist():
             if not resolved.is_relative_to(SKILL_ROOT.resolve()) or not resolved.exists():
                 missing.append(f"{source.relative_to(ROOT)} -> {target}")
     assert missing == []
+
+
+def test_agents_skill_symlink_exposes_canonical_skill():
+    link = ROOT / ".agents/skills/sssf"
+    assert link.is_symlink()
+    assert link.readlink() == Path("../../skills/sssf")
+    assert link.resolve() == SKILL_ROOT.resolve()
+    assert _frontmatter(link / "SKILL.md")["name"] == "sssf"
