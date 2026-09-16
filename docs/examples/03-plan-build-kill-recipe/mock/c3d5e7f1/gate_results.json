@@ -1,0 +1,80 @@
+[
+  {
+    "phase": "plan",
+    "attempt": 1,
+    "gate": "artifacts_exist",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/c3d5e7f1/context_handoff/plan.md",
+        "ok": true,
+        "note": "exists, 2.2KB"
+      },
+      {
+        "item": "specs/c3d5e7f1_kill_recipe.md",
+        "ok": true,
+        "note": "exists, 2.2KB"
+      }
+    ]
+  },
+  {
+    "phase": "plan",
+    "attempt": 1,
+    "gate": "files_non_empty",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/c3d5e7f1/context_handoff/plan.md",
+        "ok": true,
+        "note": "2.2KB"
+      },
+      {
+        "item": "specs/c3d5e7f1_kill_recipe.md",
+        "ok": true,
+        "note": "2.2KB"
+      }
+    ]
+  },
+  {
+    "phase": "build",
+    "attempt": 1,
+    "gate": "diff_matches_claims",
+    "passed": false,
+    "violations": [
+      "skills/sssf/cookbooks/run_adw.md: claimed but not in the diff"
+    ],
+    "checks": [
+      {
+        "item": "skills/sssf/templates/justfile",
+        "ok": true,
+        "note": "in the diff"
+      },
+      {
+        "item": "skills/sssf/cookbooks/run_adw.md",
+        "ok": false,
+        "note": "claimed but not in the diff"
+      }
+    ]
+  },
+  {
+    "phase": "build",
+    "attempt": 2,
+    "gate": "diff_matches_claims",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "skills/sssf/templates/justfile",
+        "ok": true,
+        "note": "in the diff"
+      },
+      {
+        "item": "skills/sssf/cookbooks/run_adw.md",
+        "ok": true,
+        "note": "in the diff"
+      }
+    ]
+  }
+]

@@ -9,6 +9,8 @@ performs bounded agent work.
 | Command | Purpose |
 |---|---|
 | `uv sync --locked --group dev` | Install pinned development dependencies |
+| `just doctor` | Print required tool versions; exits non-zero if one is missing |
+| `just visualizer path/to/sssf.db` | Build and serve the visualizer against a target's trace db on port 4600 |
 | `just verify` | Run formatting checks, Ruff, Pyright, tests, plugin/skill validation, link checks, and visualizer build |
 | `uv run pytest -q tests/<file>.py` | Run the smallest relevant test target while developing |
 | `just copilot-smoke` | Run the credentialed create/resume SDK smoke locally; never add it to credential-free CI |

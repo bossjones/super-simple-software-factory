@@ -1,0 +1,22 @@
+{
+  "planner": {
+    "session_id": "1a2b3c4d-5e6f-4a70-8b91-c2d3e4f5a6b7",
+    "model": "gpt-5.4",
+    "runtime": "copilot"
+  },
+  "builder": {
+    "session_id": "2b3c4d5e-6f70-4b81-9ca2-d3e4f5a6b7c8",
+    "model": "gpt-5.4",
+    "runtime": "copilot"
+  },
+  "reviewer": {
+    "session_id": "3c4d5e6f-7081-4c92-8db3-e4f5a6b7c8d9",
+    "model": "gpt-5.4",
+    "runtime": "copilot"
+  },
+  "documenter": {
+    "session_id": "4d5e6f70-8192-4da3-9ec4-f5a6b7c8d9e0",
+    "model": "gpt-5.4",
+    "runtime": "copilot"
+  }
+}

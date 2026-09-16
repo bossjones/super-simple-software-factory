@@ -1,0 +1,106 @@
+{
+  "session": {
+    "adw_id": "d4f6a8b2",
+    "adw_name": "adw_simple_sdlc",
+    "request": "Guard the stamped justfile against referencing scripts that are not stamped",
+    "status": "success",
+    "engineer": "example-engineer",
+    "started_at": "2026-09-15T16:00:12Z",
+    "ended_at": "2026-09-15T16:19:55Z",
+    "total_tokens": 163870,
+    "total_cost": 0.2915,
+    "archived": 0
+  },
+  "phases": [
+    {
+      "seq": 1,
+      "name": "request",
+      "kind": "engineer",
+      "owner": "example-engineer",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 2,
+      "name": "plan",
+      "kind": "agent",
+      "owner": "planner",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 3,
+      "name": "commit_plan",
+      "kind": "code",
+      "owner": "git",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 4,
+      "name": "build",
+      "kind": "agent",
+      "owner": "builder",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 5,
+      "name": "test_1",
+      "kind": "code",
+      "owner": "quality",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 6,
+      "name": "review_1",
+      "kind": "agent",
+      "owner": "reviewer",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 7,
+      "name": "commit_build",
+      "kind": "code",
+      "owner": "git",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 8,
+      "name": "changes",
+      "kind": "code",
+      "owner": "git",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 9,
+      "name": "document",
+      "kind": "agent",
+      "owner": "documenter",
+      "status": "success",
+      "attempt": 1,
+      "retries": 1
+    },
+    {
+      "seq": 10,
+      "name": "commit_docs",
+      "kind": "code",
+      "owner": "git",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    }
+  ]
+}

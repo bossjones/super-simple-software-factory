@@ -59,6 +59,8 @@ export class SssfDb {
   readonly sessionsDir: string;
   readonly journalMode: string;
   private readonly db: Database;
+  /** Keeps the WAL sidecars alive so the readonly connection can open; never runs a write. */
+  private readonly anchor: Database;
   /** Opened on first archive and kept; null until then. */
   private writer: Database | null = null;
   /** Cache for optionalColumn(), keyed "table.column". Only ever false → true. */
@@ -74,6 +76,13 @@ export class SssfDb {
     }
     this.path = path;
     this.sessionsDir = resolve(dirname(path), "sessions");
+    // SQLite deletes the -wal/-shm sidecars when a run's last writer closes,
+    // and a readonly connection cannot recreate them, so a finished target db
+    // fails to open readonly with SQLITE_CANTOPEN. One ordinary connection held
+    // for the server's lifetime keeps the sidecars present; it only ever runs
+    // this pragma.
+    this.anchor = new Database(path);
+    this.anchor.query("PRAGMA journal_mode").get();
     this.db = new Database(path, { readonly: true });
 
     // WAL is set by the tracer when it creates the db; a readonly connection
@@ -126,6 +135,7 @@ export class SssfDb {
   close(): void {
     this.writer?.close();
     this.db.close();
+    this.anchor.close();
   }
 
   /**

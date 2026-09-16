@@ -1,0 +1,14 @@
+{
+  "agent_name": "planner",
+  "purpose": "Turn a request into a plan the builder can implement without asking questions.",
+  "output_type": "PlanOutput",
+  "attempt": 1,
+  "status": "success",
+  "summary": "Plan adds two assertions to test_plugin_layout.py: every ADW the stamped justfile names is stamped, and every stamped ADW is either recipe-reachable or allowlisted with a reason.",
+  "artifacts": [
+    "adws/adw_data/sessions/d4f6a8b2/context_handoff/plan.md",
+    "specs/d4f6a8b2_justfile_drift_guard.md"
+  ],
+  "commit_message": "Add spec for the stamped justfile drift guard",
+  "notes_for_next_agent": "The template justfile currently names adw_prompt, adw_scout, adw_plan, adw_plan_build, adw_plan_build_test, and adw_simple_sdlc. The template directory also ships adw_build, adw_build_review, adw_build_test, adw_document, adw_quality, and adw_plan_build_test_quality with no recipe; those six go in UNRECIPED_ADWS with the reason 'building blocks composed by the chained ADWs, not day-one recipes'."
+}

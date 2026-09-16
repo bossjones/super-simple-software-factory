@@ -1,0 +1,15 @@
+{
+  "agent_name": "builder",
+  "purpose": "Implement the plan exactly; report every changed file in the envelope.",
+  "output_type": "BuildOutput",
+  "attempt": 2,
+  "status": "success",
+  "summary": "Added a guarded kill recipe to the stamped justfile and pointed the run cookbook at it.",
+  "artifacts": [],
+  "changed_files": [
+    "skills/sssf/templates/justfile",
+    "skills/sssf/cookbooks/run_adw.md"
+  ],
+  "commit_message": "Add a guarded kill recipe to the stamped justfile",
+  "notes_for_next_agent": "Verify with: stamp into a scratch repo, run `just --list | grep kill`, then `just kill 00000000` against an empty db prints '0 processes signalled'. The pid/command guard is the `case \"$live\" in \"$command\"*)` branch."
+}

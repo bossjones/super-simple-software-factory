@@ -1,0 +1,14 @@
+{
+  "agent_name": "builder",
+  "purpose": "Implement the plan exactly; report every changed file in the envelope.",
+  "output_type": "BuildOutput",
+  "attempt": 1,
+  "status": "success",
+  "summary": "Added test_stamped_justfile_recipes_match_stamped_adws with the six-entry allowlist the plan named.",
+  "artifacts": [],
+  "changed_files": [
+    "tests/test_plugin_layout.py"
+  ],
+  "commit_message": "Guard the stamped justfile against unstamped ADW references",
+  "notes_for_next_agent": "Run uv run pytest -q tests/test_plugin_layout.py. To see the guard bite, temporarily delete the sdlc recipe line from the template justfile and rerun; the reverse assertion names adw_plan_build_test."
+}

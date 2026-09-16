@@ -1,0 +1,30 @@
+{
+  "agent_name": "scout",
+  "purpose": "Find and report where things live; change nothing.",
+  "output_type": "ScoutOutput",
+  "attempt": 1,
+  "status": "success",
+  "summary": "Found four stale or unfulfilled notes across the references, one cookbook, and the stamped justfile.",
+  "artifacts": [
+    "adws/adw_data/sessions/e1a7c0de/context_handoff/scout_findings.md"
+  ],
+  "notes_for_next_agent": "All four are documentation-only; none need code changes to resolve. The kill helper gap is the only one where the fix could be either a doc edit or a new recipe.",
+  "findings": [
+    {
+      "file": "skills/sssf/references/observability.md",
+      "note": "\"Task 6 is being updated to pass the runtime metadata\" describes in-progress work; agent_sessions already stores sdk_version, runtime_version, protocol_version, and cli_version."
+    },
+    {
+      "file": "skills/sssf/cookbooks/run_adw.md",
+      "note": "Tells the reader to \"use the repository's kill helper\", but the stamped justfile has no kill recipe and no script by that name is stamped."
+    },
+    {
+      "file": "skills/sssf/templates/justfile",
+      "note": "Header comment says to \"see the example branch for the fuller set\"; no branch or link is named anywhere in the checkout."
+    },
+    {
+      "file": "ai_docs/README.md",
+      "note": "verified_on: 2026-09-14 predates the newest documentation commits; either refresh the date after re-verifying or drop the field."
+    }
+  ]
+}

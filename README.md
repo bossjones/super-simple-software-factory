@@ -9,9 +9,13 @@ The repository is an Agent Plugins 1.0 package. The distributable skill lives
 at `skills/sssf/`; that is the canonical path for scripts, cookbooks,
 references, templates, and the generated runtime.
 
-New to SSSF? [docs/tutorial.md](docs/tutorial.md) is a guided, first-time
-walkthrough from preflight through a traced run and cleanup, using the exact
-commands below in order.
+New to SSSF? [docs/quickstart.md](docs/quickstart.md) is the short path from
+a fresh clone to a traced run, starting with `just doctor`.
+[docs/tutorial.md](docs/tutorial.md) is the guided, first-time walkthrough
+with screenshots. [docs/visualizer.md](docs/visualizer.md) explains how to run
+the observability UI, and [docs/examples/](docs/examples/README.md) holds
+ready-made requests for improving this repository with SSSF, each with mock
+agent output. The [docs index](docs/README.md) lists everything.
 
 ## Requirements
 
@@ -278,6 +282,14 @@ not a supported second runtime.
 
 ## Verification
 
+Toolchain check (prints every required tool's version, exits non-zero if one
+is missing):
+
+```bash
+just doctor
+just copilot-doctor
+```
+
 Credential-free checks:
 
 ```bash
@@ -308,7 +320,9 @@ copilot --no-auto-update --plugin-dir . plugin list
 established by `plugin list`. The optional authenticated smoke path is
 `just demo`. The stamped target's supported observation commands are
 `just sessions`, `just phases ID`, `just tail ID`, and `just procs ID`; the
-visualizer is not installed by the factory installer. For the factual basis
+visualizer is not installed by the factory installer. Run it from this
+checkout with `just visualizer path/to/sssf.db`; see
+[docs/visualizer.md](docs/visualizer.md). For the factual basis
 of the runtime and operational guidance, start with
 [ai_docs/README.md](ai_docs/README.md), then read the smallest relevant
 reference. Refresh version-sensitive links against the official [CLI

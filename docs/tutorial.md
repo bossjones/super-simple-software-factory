@@ -84,7 +84,9 @@ copilot --version
 bun --version   # optional — skip if you will not run the visualizer
 ```
 
-Anything missing here will resurface as a specific failure later; fixing it
+From the SSSF checkout root, `just doctor` runs the same checks in one
+command and exits non-zero if a required tool is missing. Anything missing
+here will resurface as a specific failure later; fixing it
 now is cheaper. See [Section 10](#10-troubleshooting) if a check fails and
 the fix isn't obvious.
 
@@ -309,13 +311,17 @@ cat adws/adw_sssf_config/sssf.config.yaml
 The stamped roster ships five starter agents, each with a narrow `purpose`
 and its own prompt files under `adw_data/prompt_engineering/`:
 
-| Agent | Purpose | `writes` |
-|---|---|---|
-| `planner` | Turn a request into an implementable plan | `specs/` only |
-| `builder` | Implement the plan exactly | unrestricted except protected files |
-| `scout` | Find and report where things live | `[]` — read-only |
-| `reviewer` | Confirm the build matches the request | `[]` — read-only |
-| `documenter` | Write up the change from the diff | `docs/`, `app_docs/`, `*.md` |
+| Agent | Purpose | `writes` | Prompt files |
+|---|---|---|---|
+| [`planner`](../skills/sssf/templates/sssf.config.yaml) | Turn a request into an implementable plan | `specs/` only | [system](../skills/sssf/templates/prompt_engineering/planner/system.md), [user](../skills/sssf/templates/prompt_engineering/planner/user.md) |
+| [`builder`](../skills/sssf/templates/sssf.config.yaml) | Implement the plan exactly | unrestricted except protected files | [system](../skills/sssf/templates/prompt_engineering/builder/system.md), [user](../skills/sssf/templates/prompt_engineering/builder/user.md) |
+| [`scout`](../skills/sssf/templates/sssf.config.yaml) | Find and report where things live | `[]` — read-only | [system](../skills/sssf/templates/prompt_engineering/scout/system.md), [user](../skills/sssf/templates/prompt_engineering/scout/user.md) |
+| [`reviewer`](../skills/sssf/templates/sssf.config.yaml) | Confirm the build matches the request | `[]` — read-only | [system](../skills/sssf/templates/prompt_engineering/reviewer/system.md), [user](../skills/sssf/templates/prompt_engineering/reviewer/user.md) |
+| [`documenter`](../skills/sssf/templates/sssf.config.yaml) | Write up the change from the diff | `docs/`, `app_docs/`, `*.md` | [system](../skills/sssf/templates/prompt_engineering/documenter/system.md), [user](../skills/sssf/templates/prompt_engineering/documenter/user.md) |
+
+The stamped copies live at `adws/adw_sssf_config/sssf.config.yaml` and
+`adws/adw_data/prompt_engineering/<agent>/` in the target; the links above
+point at the templates in this checkout they were copied from.
 
 `writes` is the authoritative repository write boundary; `tools` (the
 model's allowed capabilities) only narrows what an agent *can attempt*, it
@@ -487,9 +493,13 @@ is a design mock-up, not a capture of the live UI):
 
 ![A run as swim lanes: engineer, code, planner, builder, and reviewer phases laid on a time axis, each block showing its duration, with one phase still running and the next still queued](../images/00_swimlane_waterfall.svg)
 
-`just visualizer-build` (defined in this checkout's root `justfile`, not the
-stamped one) is the build-only check `just verify` runs in CI; it does not
-start the dev server or point at any target database.
+The root `justfile` in this checkout wraps the same commands:
+`just visualizer-install`, `just visualizer-server <db>` and
+`just visualizer-dev` for the two-terminal mode above, or
+`just visualizer <db>` to build once and serve API and UI together on port
+4600. [docs/visualizer.md](visualizer.md) documents the flags, ports, and JSON
+API. `just visualizer-build` is the build-only check `just verify` runs in
+CI; it does not start a server or point at any target database.
 
 ## 10. Troubleshooting
 

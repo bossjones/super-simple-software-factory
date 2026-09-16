@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "test",
+      "area": "backend",
+      "operation": "build",
+      "command": "uv run pytest -q tests/test_plugin_layout.py",
+      "returncode": 0,
+      "passed": true,
+      "duration_seconds": 1.83,
+      "output_artifact": "adws/adw_data/sessions/d4f6a8b2/context_handoff/quality/05_test/output.log",
+      "output_tail": "5 passed in 1.62s\n"
+    }
+  ],
+  "failures": [],
+  "artifacts": [
+    "adws/adw_data/sessions/d4f6a8b2/context_handoff/quality/05_test/output.log"
+  ]
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "phase": "scout",
+    "attempt": 1,
+    "gate": "artifacts_exist",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/e1a7c0de/context_handoff/scout_findings.md",
+        "ok": true,
+        "note": "exists, 1.4KB"
+      }
+    ]
+  }
+]

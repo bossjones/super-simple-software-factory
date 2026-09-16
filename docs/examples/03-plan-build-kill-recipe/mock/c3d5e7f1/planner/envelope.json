@@ -1,0 +1,14 @@
+{
+  "agent_name": "planner",
+  "purpose": "Turn a request into a plan the builder can implement without asking questions.",
+  "output_type": "PlanOutput",
+  "attempt": 1,
+  "status": "success",
+  "summary": "Plan adds a guarded kill recipe beside procs in the stamped justfile and rewords one cookbook sentence to name it.",
+  "artifacts": [
+    "adws/adw_data/sessions/c3d5e7f1/context_handoff/plan.md",
+    "specs/c3d5e7f1_kill_recipe.md"
+  ],
+  "commit_message": "Add spec for the stamped kill recipe",
+  "notes_for_next_agent": "Use sqlite3 -separator '|' and read pid/command with IFS='|' read -r. Compare `ps -p $pid -o command=` against the recorded command with a prefix match, not equality, because ps may append arguments. Do not use bash-only syntax; the stamped justfile does not set a shell."
+}
