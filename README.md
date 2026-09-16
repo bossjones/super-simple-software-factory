@@ -1,431 +1,331 @@
 # Super Simple Software Factory
 
-> **Repeatable agents-plus-code workflows, packaged as one skill, stamped into any repo.**
-> Deterministic Python owns the graph. Coding agents are bounded nodes inside it.
+SSSF is a repeatable **agents-plus-code** workflow. Deterministic Python ADWs
+own sequencing, retries, gates, permissions, traceability, and acceptance;
+GitHub Copilot performs the bounded work that needs reading, judgement, or code
+generation.
 
-📺 Full breakdown on YouTube: **[Super Simple Software Factory](https://youtu.be/haUfb1ievTE)**
+The repository is an Agent Plugins 1.0 package. The distributable skill lives
+at `skills/sssf/`; that is the canonical path for scripts, cookbooks,
+references, templates, and the generated runtime.
 
-<p align="center">
-  <img src="images/00_swimlane_waterfall.svg" alt="A run as swim lanes: engineer, code, planner, builder, and reviewer phases laid on a time axis, each block labelled with its duration, one phase still running and the next still queued" width="850">
-</p>
+New to SSSF? [docs/quickstart.md](docs/quickstart.md) is the short path from
+a fresh clone to a traced run, starting with `just doctor`.
+[docs/tutorial.md](docs/tutorial.md) is the guided, first-time walkthrough
+with screenshots. [docs/visualizer.md](docs/visualizer.md) explains how to run
+the observability UI, and [docs/examples/](docs/examples/README.md) holds
+ready-made requests for improving this repository with SSSF, each with mock
+agent output. The [docs index](docs/README.md) lists everything.
 
-<p align="center">
-  <img src="images/01_factory_spine.svg" alt="A run spine: engineer, agent, and code phases on a deterministic rail, every event dropping into a SQLite trace db that the UI polls" width="850">
-</p>
+## Requirements
 
-A software factory does one thing: it gives you more leverage on your prompt. How much leverage depends entirely on what you invest in it. At the low end you chain two agents together and hope. At the high end you build a system of agents plus code that runs without you, and does the job about as well as you would.
+- Python 3.11+
+- [`uv`](https://docs.astral.sh/uv/)
+- Git and a GitHub Copilot subscription/access
+- `sqlite3`
+- [`just`](https://just.systems/)
+- [`Bun`](https://bun.sh/) only if you run the visualizer
 
-Everyone can get an agent to write code once. Almost nobody gets the same result twice. This fixes that by moving the control plane out of the prompt and into Python. An ADW script (AI Developer Workflow) owns sequencing, retries, and acceptance. Agents work inside named phases. Typed JSON envelopes carry context across the seams. Every event streams into SQLite while it is still happening. **Agent proposes, code disposes.**
+The pinned Python dependency is
+[`github-copilot-sdk==1.0.13`](https://github.com/github/copilot-sdk). SSSF
+uses its public client/session API; it does not fall back to shelling out to
+the CLI for agent execution.
 
-> [!NOTE]
-> **This branch is the skill alone**, which is the thing you install. For a repo with the factory already stamped into it, a demo app it planned, built, tested, reviewed, and documented, and the real traces from those runs, see the **[`example` branch](../../tree/example)**.
+## Quick start
 
----
+### Install the plugin for Copilot discovery
 
-## Why this exists
-
-<p align="center">
-  <img src="images/02_control_plane.svg" alt="Left: one big agent owning its own loop with no phase boundary and no acceptance. Right: code owning the loop with agents as bounded, gated nodes" width="780">
-</p>
-
-Hand a capable model your whole SDLC and you get a machine with no seams. There is no phase boundary, so you cannot say which step failed. There is no acceptance criterion you can name, so "done" means "the agent stopped talking." A retry is a cold start that throws away everything the agent just learned. The only trace is a transcript you have to read like a novel. Run it twice, get two different systems.
-
-The fix is not a better prompt. The fix is deciding, deliberately, that **code owns sequencing, retries, and acceptance, and the agent owns only the work inside one bounded phase**. Everything else falls out of that one line. Phases become the unit of the trace. Envelopes become the only way context crosses a seam. Gates become the definition of done. A correction becomes cheaper than a restart, because the session is still alive.
-
-### Agents are great. You do not always need one.
-
-This is the part most engineers are going to skip, and pay for later.
-
-Code costs nothing. It runs at the speed of light. You can change it in a second. And you actually own it, which is not true of any model you are renting by the token.
-
-So when the invocation is already known, write it down. `bun test` is not a judgement call. Neither is `ruff check`. An agent rediscovering your test runner burns a context window to learn what a subprocess already knows, and it charges you for the privilege every single run. Worse, it puts a passing test suite into a context window, which buys you nothing at all.
-
-Agents are for the parts that need reading and deciding. Everything else is a `kind="code"` phase. When code fails, the failure comes back to the builder as an envelope, through the same door an agent's report would have used. The repair loop is identical. You just stopped paying an agent to do arithmetic.
-
-The bill for skipping this is not only tokens. It is cost, speed, and consistency, and you pay it on run one hundred and run one thousand, not on run one.
-
-> *Same models. Same prompts. The difference is who owns the loop.*
-
----
-
-## Install
-
-Two steps: get the skill into your repo, then stamp the factory.
-
-### Agentic Install
-
-Copy `.claude/skills/sssf/` into the target repo and type `/sssf install` inside Claude Code. The skill is named `sssf`, so that is the skill name followed by the `install` argument. There is no bare `/install` command. The agent reads the skill's own `cookbooks/install.md` and does the rest.
-
-### Manual Install
-
-**Prereqs:** [`uv`](https://docs.astral.sh/uv/), [`pi`](https://github.com/mariozechner/pi-coding-agent), `sqlite3`, and an API key for whichever providers your roster names (see below). [`bun`](https://bun.sh) only if you want the visualizer.
+This installs the published plugin for Copilot to discover. It does **not**
+copy the SSSF installer or runtime into another repository:
 
 ```bash
-# 1. get the skill into the target repo
-mkdir -p .claude/skills
-cp -r /path/to/super-simple-software-factory/.claude/skills/sssf .claude/skills/
-
-# 2. stamp the factory (run from the target repo ROOT, the cwd is where everything lands)
-uv run .claude/skills/sssf/scripts/install.py
-cp .env.sample .env                              # then set OPENROUTER_API_KEY
-pi --version                                     # confirm pi is on PATH, or set PI_PATH in .env
-git init && git commit --allow-empty -m init     # chains that end in a commit phase need a repo
-
-# 3. smoke test: two cheap read-only runs, end to end
-just demo
-just sessions              # what just happened
-just obs                   # the trace UI, needs bun
-
-# no just? every recipe is one line. the raw form of `just demo` is:
-uv run adws/adw_prompt.py "reply with a one-line summary of this repo" --agent scout
+copilot plugin install bossjones/super-simple-software-factory
 ```
 
-Re-running `install.py` is safe. It skips every file that already exists and reports what it skipped, so a second run doubles as a drift check. `--force` refreshes stamped code to the skill's current version, but it overwrites **all** stamped files including your `sssf.config.yaml` and your prompts, so commit first.
+`copilot skill list` is optional diagnostic output. Its contents and whether
+plugin-provided skills appear are CLI-version-dependent; `copilot plugin list`
+is the required plugin-discovery check.
 
-Green on the smoke test means the whole path works: config validated, session minted, Pi ran, envelope parsed, events landed in `adws/adw_data/sssf.db`. Fix it there before composing anything larger, because every multi-agent chain rides this exact path.
+### Stamp a target repository
 
-### Which API keys you actually need
+Obtain an SSSF checkout separately, either by locating an existing checkout or
+cloning one:
 
-That depends on your roster, not on this repo. Every `model:` in `sssf.config.yaml` is written `provider/model-id`, and the provider half decides the key. Which key pi reads for a given provider comes from `~/.pi/agent/models.json`.
+```bash
+git clone https://github.com/bossjones/super-simple-software-factory.git \
+  "$HOME/src/super-simple-software-factory"
+```
 
-The starter roster deliberately mixes providers to show the point, so out of the box it wants three:
+From the target repository root, invoke the installer from that checkout:
 
-| Model in the starter roster | Provider | Key |
-|---|---|---|
-| `google/gemini-3.6-flash` (default, builder, scout) | served via openrouter | `OPENROUTER_API_KEY` |
-| `fireworks/accounts/fireworks/models/kimi-k3` (planner) | fireworks | `FIREWORKS_API_KEY` |
-| `openai/gpt-5.6-terra`, `openai/gpt-5.6-luna` (reviewer, documenter) | openai | `OPENAI_API_KEY` |
+```bash
+uv run "$HOME/src/super-simple-software-factory/skills/sssf/scripts/install.py"
+```
 
-**Want one key instead of three?** Delete the per-agent `model:` lines and let every agent inherit `defaults.model`. The whole roster then runs on one provider. Cheapest way to get a first green run.
+If the target repository is this checkout, the relative form is:
 
-One sharp edge worth knowing: `agents.validate()` checks that a model is *written* as `provider/id`, not that the provider is reachable or that its key is set. A missing key does not fail at startup. It fails when that agent runs, partway into a chain.
+```bash
+uv run skills/sssf/scripts/install.py
+```
 
+Then authenticate and run the stamped target:
 
----
+```bash
+copilot login
+just demo
+just sessions
+```
 
-## Three principles
+The installer is idempotent: existing files are skipped. Commit or back up
+local configuration before using `--force`, which refreshes stamped files.
+Manual installation is a fallback when the installer checkout is unavailable.
+Copy templates from a separately located SSSF checkout; plugin installation
+alone does not provide these files:
 
-Everything here is built to be **observable**, **customizable**, and **reusable**. Those are not adjectives, they are the reason the parts are shaped the way they are.
+```bash
+SSSF_ROOT="$HOME/src/super-simple-software-factory"
+mkdir -p adws/adw_data adws/adw_sssf_config
+cp -R "$SSSF_ROOT/skills/sssf/templates/adws/." adws/
+cp -R "$SSSF_ROOT/skills/sssf/templates/prompt_engineering" adws/adw_data/
+cp "$SSSF_ROOT/skills/sssf/templates/sssf.config.yaml" \
+  adws/adw_sssf_config/sssf.config.yaml
+cp "$SSSF_ROOT/skills/sssf/templates/env.sample" .env.sample
+cp "$SSSF_ROOT/skills/sssf/templates/justfile" justfile
+```
 
-**Observable.** If you cannot measure your agents, you cannot improve them. Every event goes into SQLite as it happens, so you can watch a run mid-flight, not read about it afterwards.
+Copy only the files needed by the target repository and preserve local
+customizations. The installer is the preferred path because it also adds the
+target-repository ignore rules. Session and trace directories are created on
+the first ADW run.
 
-**Customizable.** One YAML file sets the core four for every agent: context, model, prompt, tools. Different models at different price and speed points, in the same run. It is not about which model is best anymore, it is about which model is right for that one phase.
+### Local plugin development
 
-**Reusable.** The whole thing is a skill you stamp into any repo, then bend to fit. The tests it ships are not your tests. The prompts it ships are starters. It is designed to be edited.
+Do not pass a local directory to `copilot plugin install`. Validate an
+uninstalled checkout with the CLI's plugin directory option instead:
 
-There are three actors here, and the design keeps them separate on purpose: **the engineer**, **the code**, and **the agents**. The trick is not running more agents. The trick is using all three at the right moment.
+```bash
+copilot --plugin-dir /path/to/super-simple-software-factory plugin list
+```
 
----
+From this checkout, the equivalent commands are:
 
-## The skill is the product
+```bash
+copilot --no-auto-update --plugin-dir . plugin list
+```
 
-<p align="center">
-  <img src="images/03_skill_stamp.svg" alt="The sssf skill directory on the left stamping config, adws, and prompt_engineering into three different target repos" width="780">
-</p>
+The plugin listing should show `sssf` as an enabled external plugin. Optionally
+run `skill list --json` or invoke the skill; either result is
+CLI-version-dependent and plugin-provided skills may not appear in the list.
+Avoid enabling another active copy of the same skill while testing.
 
-Everything lives in `.claude/skills/sssf/`. `SKILL.md` carries the hard rules and routes each request to one of nine cookbooks. `references/` holds the deep specs, `scripts/` holds the generators, `templates/` holds exactly what gets stamped.
+This checkout also carries a tracked symlink `.agents/skills/sssf` that
+resolves to `skills/sssf/`, so `copilot skill list` run from the repository
+root lists `sssf` under project skills without `--plugin-dir`. If the
+published plugin is installed as well, Copilot loads the skill twice while
+working inside the checkout. Windows clones need `git config core.symlinks
+true` before checkout, otherwise the link is a plain text file.
 
-| What lands in your repo | Where it comes from | Tracked |
-|---|---|---|
-| `adws/adw_sssf_config/sssf.config.yaml` | `templates/sssf.config.yaml` | yes, it is your agent roster |
-| `adws/adw_*.py` | `templates/adws/` | yes, twelve starter workflows |
-| `adws/adw_modules/` | `templates/adws/adw_modules/` | yes, all low-level logic |
-| `adws/adw_data/prompt_engineering/` | `templates/prompt_engineering/` | yes, **your prompts live here** |
-| `adws/adw_data/harness_engineering/` | `templates/harness_engineering/` | yes, pi extensions |
-| `.env.sample` | `templates/env.sample` | yes |
-| `justfile` | `templates/justfile` | yes, starter recipes to run and watch |
-| `adws/adw_data/sessions/`, `sssf.db` | created at runtime | no, gitignored |
+## SDK and runtime preflight
 
-The prompts are yours the moment they land. Edit them in `adws/adw_data/prompt_engineering/{agent}/`, never back inside the skill.
+Run these checks before a first ADW run or after updating the SDK/CLI:
 
-There is no DSL here. No framework to learn. It is Python, YAML, agents, and a skill, which is exactly what these models are already trained on. Staying in distribution is a feature.
+```bash
+copilot --version
+uv run --with github-copilot-sdk==1.0.13 python -c \
+  "import importlib.metadata as m; print(m.version('github-copilot-sdk'))"
+uv run --with github-copilot-sdk==1.0.13 python -m copilot download-runtime
+```
 
----
+The SDK adapter validates the installed SDK and the managed runtime protocol
+before an agent phase starts. The expected SDK release is pinned in the
+generated ADW entry points and project metadata. `download-runtime` stages the
+matching managed runtime; the SDK can otherwise download it on first use.
+CLI login is preferred. A local ignored `.env` is also an accepted token store
+for the variables in `.env.sample`; never commit `.env` or put tokens in
+prompts, YAML, or CLI arguments.
 
-## The agent roster
+See the official [Copilot CLI command
+reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference),
+[Python SDK README](https://github.com/github/copilot-sdk/blob/main/python/README.md),
+and [SDK repository](https://github.com/github/copilot-sdk).
 
-`adws/adw_sssf_config/sssf.config.yaml` answers one question per entry: who is this agent. One agent, one prompt, one purpose.
+## Run an ADW
+
+Run from the target repository root:
+
+```bash
+uv run adws/adw_plan.py "add a health endpoint"
+uv run adws/adw_plan_build.py requests/health.md
+uv run adws/adw_simple_sdlc.py "implement the health endpoint"
+```
+
+Use `--config path/to/sssf.config.yaml` for a non-default roster and
+`--adw-id ID` to join an existing SSSF session. `just demo` runs a small
+credentialed smoke path; `just sessions`, `just phases ID`, and `just procs ID`
+inspect the resulting trace. A known command belongs in a deterministic
+`kind="code"` phase, not in an agent prompt.
+
+### Sessions and corrections
+
+The first call creates a caller-selected Copilot session ID. Later phases,
+parse corrections, and gate corrections resume that same session. SSSF stores
+the mapping in `adws/adw_data/sessions/{adw_id}/agent_map.json` and keeps the
+raw event stream beside the envelope. A model change intentionally starts a
+fresh session rather than resuming context created by another model.
+
+`send_and_wait()` only bounds waiting. On a phase deadline the runtime calls
+`session.abort()` explicitly, then disconnects without deleting resumable
+state. Resume failures are reported; they are never silently replaced with a
+new session. See the [session persistence
+guide](https://github.com/github/copilot-sdk/blob/main/docs/features/session-persistence.md)
+and [streaming events guide](https://github.com/github/copilot-sdk/blob/main/docs/features/streaming-events.md).
+
+## Configuration
+
+The generated file is `adws/adw_sssf_config/sssf.config.yaml`. Common fields
+are:
 
 ```yaml
 defaults:
-  coding_agent: pi                 # v1 runs pi only, claude_code is schema-valid and stubbed
-  model: google/gemini-3.6-flash   # provider/model-id, a bare id can match several providers
-  thinking: medium                 # off | minimal | low | medium | high | xhigh | max
-  protected_files:                 # no agent may edit the machinery that grades it
-    - adws/adw_modules/
-    - adws/adw_sssf_config/
-    - adws/adw_*.py
+  model: gpt-5.4
+  reasoning_effort: medium
+  context_tier: default
+  tools: [view, rg, glob, bash, apply_patch]
+  skill_directories: []
+  plugin_directories: []
+  mcp_servers: {}
+  writes: null
+  timeouts:
+    phase_seconds: 1800
+    tool_seconds: 300
+    correction_seconds: 300
   data_dir: adws/adw_data
-
-agents:
-  - name: planner
-    model: fireworks/accounts/fireworks/models/kimi-k3
-    thinking: high                 # per-agent overrides win over defaults
-    color: "#a78bfa"               # this agent's lane swatch in the trace
-    purpose: Turn a request into a plan the builder can implement without asking questions.
-    prompt_engineering:
-      system: adws/adw_data/prompt_engineering/planner/system.md
-      user: adws/adw_data/prompt_engineering/planner/user.md
-    harness_engineering:
-      - adws/adw_data/harness_engineering/subagents.ts   # this agent can spawn subagents
-    writes:                        # the plan is all it may leave in the repo
-      - specs/
 ```
 
-Five starter agents ship in the box: `planner`, `builder`, `scout` (read-only recon), `reviewer`, and `documenter`. There is no tester, because running a suite is a known command and therefore code.
+Agent entries inherit defaults and may override model, reasoning effort,
+context tier, tools, skill/plugin directories, MCP servers, `writes`, and
+timeouts. Models are unqualified Copilot model IDs such as `gpt-5.4`.
+`tools` must be an explicit non-empty Copilot allowlist because the adapter
+uses SDK empty mode; there is no implicit "all tools" value. `writes` is the
+authoritative repository boundary, while `tools` narrows capabilities.
+`protected_files` remains off limits unless explicitly unlocked for that
+agent. Only `phase_seconds` is currently enforced as a timeout.
+`tool_seconds` and `correction_seconds` are reserved fields, not independent
+enforcement controls. Read [references/config.md](skills/sssf/references/config.md)
+before changing a roster.
 
-Every agent gets its own model, thinking level, prompts, tools, and harness. That is the core four, and it is the whole surface you tune. Give the planner a frontier model and the builder a cheap fast one. Give the scout subagents. Give the reviewer no ability to write code at all.
+## Skills, plugins, MCP, and permissions
 
-**`tools` is a capability list. `writes` is the boundary.** They are not the same thing, and the difference matters: `bash` runs anything, including `git checkout`, and `write` reaches any path. So "this agent changes nothing" is enforced in code, after every call, by comparing the repo before and after. Unauthorized changes are rolled back and the phase fails. A read-only agent is read-only with respect to your repo, never unable to write its own report.
+- `SKILL.md` follows the open [Agent Skills
+  specification](https://agentskills.io/specification). Project skills are
+  discovered from supported skill directories; SSSF's packaged skill is under
+  `skills/sssf/`. A tracked symlink at `.agents/skills/sssf` points to that
+  directory so a plain checkout also exposes it as a project skill.
+- A plugin may bundle skills, agents, hooks, MCP, and LSP resources. The
+  `plugin.json` manifest follows the [Agent Plugins 1.0
+  specification](https://github.com/agentplugins/agent-plugins-spec/blob/main/spec/1.0.0.md).
+- MCP servers are configured with the SDK's `mcp_servers` field or Copilot's
+  documented project/user configuration. Review server commands and
+  permissions before enabling them.
+- Use the narrowest available tools and URLs. Copilot permissions, hooks, and
+  sandboxes reduce risk but do not prove that repository writes stayed within
+  policy. SSSF's before/after snapshot and rollback check is authoritative.
 
-Config defines who an agent **is**. The ADW call site defines how it is **used**. That split is what lets one agent serve many different calls. **ADW scripts never name a model, they name an agent.**
+Official references: [Agent Skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills),
+[Copilot plugins](https://docs.github.com/en/copilot/concepts/agents/about-plugins),
+[MCP servers](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers),
+[permissions](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference),
+and [hooks](https://docs.github.com/en/copilot/concepts/agents/hooks).
 
----
+## Breaking migration
 
-## Phases: three lanes, one primitive
+This is a breaking harness migration. Existing generated repositories are not
+silently rewritten. Reinstall or migrate them deliberately, then run the
+verification commands below.
 
-<p align="center">
-  <img src="images/04_phase_lanes.svg" alt="Swim lanes for engineer, git, planner, builder, and reviewer with phase blocks placed on a time axis and one dashed queued block" width="780">
-</p>
+| Historical surface | Copilot-native replacement |
+|---|---|
+| Former agent-runtime selector | Copilot is the only supported runtime; remove the selector |
+| Former thinking setting | `reasoning_effort` |
+| Former extension bundle setting | `skill_directories`, `plugin_directories`, and `mcp_servers` |
+| Provider-qualified model IDs | Unqualified Copilot model IDs |
+| Former runtime/path environment variables | `COPILOT_CLI_PATH` and `COPILOT_HOME` |
+| Former agent adapter and extensions | `agent_copilot.py` and public SDK configuration |
 
-Every run is a sequence of phases, and every phase is the same context manager no matter who owns it.
+Do not copy old runtime directories into a new installation. Preserve old
+SQLite traces for historical analysis, but do not expect old session state to
+resume under a changed model or runtime. The [migration
+matrix](ai_docs/pi-to-copilot-migration-matrix.md) is a historical comparison,
+not a supported second runtime.
 
-```python
-REQUIRED_AGENTS = ["planner", "builder", "reviewer"]   # names, never models
+## Troubleshooting
 
-cfg = agents.load_config(config)
-agents.validate(cfg, REQUIRED_AGENTS)   # a missing agent fails before anything spawns
-run = session.ensure(cfg, adw_id)       # pin-or-create the session
+1. **Plugin or skill is missing:** run the local `--plugin-dir` commands from
+   the repository root; confirm `plugin.json` and `skills/sssf/SKILL.md` are
+   inside the checkout.
+2. **SDK preflight fails:** compare `copilot --version`, the pinned SDK
+   version, and the managed runtime. Repeat both SDK commands with
+   `uv run --with github-copilot-sdk==1.0.13 ...`.
+3. **Authentication fails:** prefer `copilot login`; alternatively use the
+   documented token variables in a local ignored `.env`. Never commit `.env` or
+   put a token in YAML, prompts, command arguments, or trace artifacts.
+4. **A resume fails:** keep the recorded session ID for diagnosis. Check the
+   runtime and model; do not replace the ID with a new session manually.
+5. **A run times out:** inspect the phase and process rows with
+   `just phases ID`, `just tail ID`, and `just procs ID`. Verify the PID and
+   recorded command shown by `just procs ID` before terminating the ADW process
+   using the host operating system's process controls. The runtime aborts
+   active Copilot work before cleanup.
+6. **A gate or permission fails:** read the gate evidence and changed-path
+   report. Fix the agent prompt/configuration or the work product, then rerun;
+   do not edit envelopes or trace rows by hand.
 
-with run.phase(PhaseParams(name="plan", kind="agent", owner="planner",
-                           description="Turn the request into an implementable plan")) as ph:
-    plan = ph.call(AgentCall(output_type=PlanOutput, prompt=prompt,
-                             gates=[gates.artifacts_exist, gates.files_non_empty]))
+## Verification
 
-with run.phase(PhaseParams(name="commit", kind="code", owner="git",
-                           description="Commit the working tree")) as ph:
-    message = build.commit_message or f"sssf({run.adw_id}): {build.summary}"
-    ph.log(sha=git_helper.commit_all(message), message=message)
-
-return run.finish(accepted=review.approved, reason="the reviewer never approved")
-```
-
-Three kinds, three swim lanes. **engineer** is the human lane. **agent** is `ph.call(...)`: prompt in, typed envelope out, gates verified. **code** is a deterministic step that stands on its own, like a commit or a migration, and it is never buried inside an agent phase, so the trace shows exactly when code ran and when an agent was working.
-
-That commit phase is the whole pattern in miniature. The builder proposes the message as a field on its envelope. Code decides whether to use it, falls back when it is empty, and performs the write. The agent never runs `git commit` itself.
-
-**Success must be earned.** Every phase defaults to `fail`. A clean exit flips it, and an agent phase also needs its envelope to parse and every gate to come back green. `run.finish(accepted=...)` adds the second question, because phases passing is not the same as the run being acceptable: a test phase that ran a red suite did its job perfectly. One call settles the exit code, the session status, and the banner together, so they cannot disagree.
-
----
-
-## Envelopes and gates
-
-<p align="center">
-  <img src="images/05_envelope_gates.svg" alt="An agent's final JSON parsed against its output type, checked by gates, with violations looping back into the same session as a correction" width="780">
-</p>
-
-An agent has exactly two output channels: reference files written into `context_handoff/`, and a final valid-JSON response parsed against the output type the call declared. Code persists that response as `envelope.json`, records it, and injects it into the next agent's prompt. Context transfers in code, not in conversation.
-
-```python
-class EnvelopeBase(BaseModel):
-    status: Literal["success", "fail"]
-    summary: str = ""
-    artifacts: list[str] = Field(default_factory=list)
-    notes_for_next_agent: str = ""
-
-class BuildOutput(EnvelopeBase):
-    changed_files: list[str] = Field(default_factory=list)
-    commit_message: str = ""        # consumed by the git commit phase
-```
-
-Determinism is wired into every step. Agents must return a specific structure, every time. If it does not parse, they get asked again until it does.
-
-Gates verify claims, never predictions. Nobody knows which files an agent will touch before it finishes, so gates run **after** the fact against the envelope's own declarations: `artifacts_exist`, `files_non_empty`, `json_parses`, `diff_matches_claims`, `tests_pass(...)`. A gate is a callable with the signature `gate(envelope, run) -> GateReport`, one `check(item, ok, note)` per thing it examined, so a green gate tells you *what* it verified.
-
-When JSON does not parse or a gate returns violations, **nothing restarts**. The harness re-prompts the same session with a correction naming exactly what was wrong, and the context window stays intact. Pi treats `--session-id` as create-or-continue, so running an agent and continuing it are the same call. A cold restart throws away everything the agent learned. A correction costs one message.
-
-The output contract lives in three places and they are one thing: the type in `data_types.py`, the JSON example in that agent's `user.md` `## Report` section, and `output_type=` at the call site. **Change one, change all three in the same edit.**
-
----
-
-## The trace
-
-<p align="center">
-  <img src="images/06_trace_path.svg" alt="Running agents to tracer.py to a WAL SQLite db with seven tables, read by a cursor poll query, with no websocket and no ingest endpoint" width="780">
-</p>
-
-One data path, no exceptions: **agents write to SQLite, readers poll SQLite.** `agent_pi.py` tails the coding agent's JSONL stdout line by line and the tracer inserts each event while the agent is still working, so tool calls are visible mid-run instead of batched at the end.
-
-Ten event types land across seven tables: `sessions`, `phases`, `events`, `envelopes`, `gate_results`, `agent_sessions`, and `processes` (adw_id to pid, so a stuck run can be found and stopped). Every event logs against both its `adw_id` and its `phase_id`, and `parent_id` nests spans, so an agent phase expands into its own tool calls.
-
-Pi announces a tool call across three raw events, so the interface folds them into exactly **one** `tool_call` row per real call. Each row is named the way you would read it aloud (`bash: ls -la src`) and carries `{tool, tool_call_id, args, result_snippet, ok, duration_ms, agent}`.
-
-```sql
-select * from events where adw_id = ? and rowid > ? order by rowid limit 500;
-```
-
-That one cursor query is the entire transport. Live view and full history are the same query at different cadence, which is why there is no ingest endpoint, no WebSocket, no backfill, and no separate replay path. Every connection opens WAL, so reads never block the running writers.
-
-Files stay the raw record (`raw_output.jsonl`, `envelope.json`, `agent_map.json`). The db is the queryable mirror. Losing it loses nothing you cannot rebuild.
-
-The skill ships a read-only UI for this db at `.claude/skills/sssf/apps/visualizer/`: Vue and Vite served by Bun on port 4600, with sessions, a trace waterfall, and per-phase tool-call detail.
+Toolchain check (prints every required tool's version, exits non-zero if one
+is missing):
 
 ```bash
-cd .claude/skills/sssf/apps/visualizer && bun install
-SSSF_DB=/abs/path/to/your-repo/adws/adw_data/sssf.db bun run server/index.ts &
-bunx vite
+just doctor
+just copilot-doctor
 ```
 
-It resolves its target through `--db`, then `SSSF_DB`, then `<cwd>/adws/adw_data/sssf.db`, so one instance can point at any stamped repo. Pass the db explicitly, because the server runs from the app dir.
-
----
-
-## What is in this branch
-
-```
-super-simple-software-factory/          # the deployable factory, and nothing else
-└── .claude/skills/sssf/
-    ├── SKILL.md                        # hard rules + request routing table
-    ├── cookbooks/                      # 9 orchestrator playbooks, loaded lazily
-    ├── references/                     # config / handoff / observability specs
-    ├── scripts/                        # install.py, make_config.py, make_adw.py
-    ├── apps/visualizer/                # the read-only trace UI (Vue + Vite on Bun)
-    └── templates/                      # EXACTLY what install.py stamps
-        ├── sssf.config.yaml            # the starter roster
-        ├── prompt_engineering/{agent}/ # system.md + user.md per agent
-        ├── harness_engineering/        # pi extensions
-        └── adws/
-            ├── adw_*.py                # the twelve starter workflows
-            └── adw_modules/            # ALL low-level logic, ADW scripts stay thin
-```
-
-The skill is also what an agent reads to *operate* the factory. `SKILL.md` is the central idea, and the cookbooks are lazily loaded recipes it pulls in one at a time: set up the factory, create an ADW, modify a chain, add an agent, run and monitor. If you can teach an agent to do something, teach it, then go build the thing it cannot.
-
----
-
-## The twelve starter workflows
-
-Every ADW takes the same shape:
+Credential-free checks:
 
 ```bash
-uv run adws/adw_*.py "<prompt or path/to/prompt.md>" [--config adws/adw_sssf_config/sssf.config.yaml] [--adw-id a1b2c3d4]
+just verify
 ```
 
-| ADW | Chain | Reach for it when |
-|---|---|---|
-| `adw_prompt` | engineer to \<agent\> | one agent, one prompt, `--agent NAME` picks who |
-| `adw_scout` | engineer to scout | read-only recon, nothing changes |
-| `adw_plan` | engineer to planner | you want the spec before any code |
-| `adw_build` | engineer to builder | the plan already exists |
-| `adw_quality` | engineer to code(quality) | lint, typecheck, build, no agents at all |
-| `adw_plan_build` | planner, builder, git(commit) | small, well-understood work |
-| `adw_build_test` | builder, code(test), bounded fix loop | there is a suite to satisfy |
-| `adw_build_review` | builder, reviewer, bounded revise loop | "is this what was asked for" matters more than "does it run" |
-| `adw_plan_build_test` | plan, build, code(test), git(commit) | the standard chain |
-| `adw_plan_build_test_quality` | same, plus lint/typecheck/build gates | the repo has quality commands worth enforcing |
-| `adw_document` | code(git diff), documenter | write up what just shipped |
-| `adw_simple_sdlc` | plan, build, test, review, document | the work is real and its shape is not obvious |
+This runs the Ruff format check and lint, Pyright, pytest, plugin schema
+validation, Markdown link validation, and the visualizer build.
 
-`adw_simple_sdlc` lands three commits from three authors. The plan, the code, and the write-up each get their own, and each message is the words of the agent that produced it.
-
-`--adw-id` is optional everywhere. Omit it and a fresh id is minted and printed. Supply it and the run joins that session: same dirs, same `context_handoff/`, and each agent **resumes its existing context window** through `agent_map.json` instead of starting cold. That is how you chain workflows.
+With Copilot authentication and entitlement available, also run the opt-in
+runtime smoke:
 
 ```bash
-uv run adws/adw_plan.py "add a /health endpoint"              # prints adw_id a1b2c3d4
-uv run adws/adw_build_test.py "implement the plan" --adw-id a1b2c3d4
+just copilot-smoke
 ```
 
-Watch a run with the trace db directly:
+The live smoke covers authenticated SDK create/disconnect, a read-only turn,
+event capture, and a same-session resumed correction. Deterministic tests, not
+model behavior, verify allowed writes and unauthorized-write rollback.
+
+Local plugin discovery:
 
 ```bash
-sqlite3 adws/adw_data/sssf.db "select adw_id, status, substr(request,1,60), total_tokens from sessions order by started_at desc limit 10;"
-sqlite3 adws/adw_data/sssf.db "select seq, name, kind, owner, status from phases where adw_id='a1b2c3d4' order by seq;"
-sqlite3 adws/adw_data/sssf.db "select kind, name, pid, command from processes where adw_id='a1b2c3d4' and ended_at is null;"
+copilot --no-auto-update --plugin-dir . plugin list
 ```
 
-Reads never block a running workflow, the db is WAL. `install.py` stamps a `justfile` wrapping all of the above, so in a fresh repo these are `just sessions`, `just phases <adw_id>`, `just tail <adw_id>`, and `just procs <adw_id>`.
-
----
-
-## Where it can still fail
-
-Honest edges, because knowing them is cheaper than discovering them.
-
-| Failure | What actually happens | What to do |
-|---|---|---|
-| The test phase reports green on a fresh install | `quality.py` ships placeholder commands that exit 0. Three ADWs run them as their test phase | Wire your real commands into `quality.py` before trusting `adw_build_test`, `adw_plan_build_test`, or `adw_simple_sdlc`. This is the first thing to customize |
-| A bare model pattern | The same model sits under several providers, so `gemini-3.6-flash` matches three catalog entries and `agents.validate()` refuses to spawn | Always write `provider/model-id` |
-| `just` is not installed | The stamped `justfile` is a convenience wrapper, nothing depends on it | Every recipe is a one-line `uv run` or `sqlite3` command. Open the justfile and run the line yourself |
-| A coding agent hangs silently | No events, no tokens, an empty `raw_output.jsonl`. The trace goes quiet rather than red | Query `processes` for what is alive and kill it children-first. A killed run finalizes its own trace to `fail` |
-| The synced triad drifts | Type, `## Report` example, and `output_type=` disagree, so every call burns correction rounds | Grep the type name and fix all three in one edit |
-| Gates pass, output is bad | Gates check what a predicate can check, not plan quality or code taste | Run the `reviewer`, or read it yourself |
-| An agent edits something it should not | Detected and rolled back after the call, and the phase fails | Expected. Widen that agent's `writes` if the change was legitimate |
-| Commit phase has nothing to commit | `commit_all` raises if the cwd is not a git repo or nothing changed | `git init` with one commit first. A no-op build fails the phase rather than committing nothing |
-| `install.py --force` | Overwrites **all** stamped files, config and prompts included | Commit before you force |
-| `coding_agent: claude_code` | Schema-valid, but `agent_cc.py` raises | v1 is Pi only |
-
-Also missing on purpose, so you know what to add: this runs on your current branch. For real work you want a branch per run, a sandbox around the agent, and a merge step at the end.
-
-**Is this overkill for a one-off feature?** Yes. Prompt an agent and move on. This earns its keep when the same workflow runs a hundred times, when validation is the only thing standing between you and a bad merge, and when you need the thousandth run to look like the first.
-
----
-
-## Built to be Observed, Customized, and Reused
-
-This is a starting point, not a product. Nothing here is meant to survive contact with your codebase unchanged.
-
-The tests it ships are not your tests. The prompts it ships describe a demo app, not your domain. The roster names the models that were good the week it was written. All of that is supposed to be replaced, and the whole thing is shaped so that replacing it is a small edit in an obvious file instead of a rewrite. That is what those three properties are for. **Observable** so you can see which part is actually costing you. **Customizable** so the fix is one file. **Reusable** so you do it once and stamp it everywhere.
-
-Where to start, roughly in the order that pays off fastest:
-
-| Change | File | Why |
-|---|---|---|
-| Your real commands | `adws/adw_modules/quality.py` | The shipped blocks are placeholders that exit 0. Until you wire this, your test phase is theater |
-| Your prompts | `adws/adw_data/prompt_engineering/{agent}/` | Where your standards live: what a good plan looks like, what a review has to catch |
-| Your roster | `adws/adw_sssf_config/sssf.config.yaml` | Models, thinking levels, tools, and what each agent is allowed to write |
-| Your chains | `adws/adw_*.py` | Copy the closest workflow and edit the phase list. They are 40 to 180 lines on purpose |
-| Your definition of done | `adws/adw_modules/gates.py` | A gate is one function. Whatever "done" means where you work, write it here |
-| Your agent capabilities | `adws/adw_data/harness_engineering/` | Pi extensions, a different set per agent if that is what the job needs |
-
-And what it deliberately does not do. It runs on your current branch. There is no sandbox, no branch per run, no merge step, no cloud, and no human-in-the-loop approval phase. Those are the obvious next things to build. They are left out so the core stays small enough to read in one sitting, which is the only reason you would trust it enough to change it.
-
-So take it. Fork it, strip the parts you do not need, rename the agents, throw out half the workflows, and roll what is left into the factory your product actually needs. The specific chains in here matter far less than the shape: code owns the loop, agents own the phases, and every run leaves a trace you can go read.
-
----
-
-## See it in a real repo
-
-The [`example` branch](../../tree/example) is this same skill with the factory already stamped in: a populated `adws/`, a `justfile`, a demo app the factory planned, built, tested, reviewed, and documented, and the specs, docs, and traces those runs produced.
-
-```bash
-git clone <this-repo> sssf && cd sssf
-git checkout example
-```
-
----
-
-## License
-
-MIT, see [`LICENSE`](LICENSE).
-
----
-
-## Master Agentic Coding
-
-<p align="center">
-  <img src="images/08_rise_with_the_ceiling.svg" alt="Vibe coding sits inside a narrow band with a short arrow of headroom above it, agentic engineering rises far above that band with a tall one" width="850">
-</p>
-
-Vibe coding is not knowing how your system works, and not looking. Agentic engineering is knowing how your system works so well that you do not have to look.
-
-Master agentic coding by gaining a deeper understanding of the foundational units of the software factory.
-
-Learn tactical agentic coding patterns with [Tactical Agentic Coding](https://agenticengineer.com/tactical-agentic-coding?y=sssf).
-
-Follow the [IndyDevDan YouTube channel](https://www.youtube.com/@indydevdan) to improve your agentic coding advantage.
-
----
-
-Stay Focused and Keep Building
-
-- IndyDevDan
+`skill list --json` is optional and version-dependent; plugin discovery is
+established by `plugin list`. The optional authenticated smoke path is
+`just demo`. The stamped target's supported observation commands are
+`just sessions`, `just phases ID`, `just tail ID`, and `just procs ID`; the
+visualizer is not installed by the factory installer. Run it from this
+checkout with `just visualizer path/to/sssf.db`; see
+[docs/visualizer.md](docs/visualizer.md). For the factual basis
+of the runtime and operational guidance, start with
+[ai_docs/README.md](ai_docs/README.md), then read the smallest relevant
+reference. Refresh version-sensitive links against the official [CLI
+docs](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-copilot-cli)
+and [Python SDK docs](https://github.com/github/copilot-sdk) before changing
+the integration.

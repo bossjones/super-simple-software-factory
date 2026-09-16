@@ -1,0 +1,34 @@
+{
+  "session": {
+    "adw_id": "a2b4d1c9",
+    "adw_name": "adw_plan",
+    "request": "Plan: detect the test command at install time",
+    "status": "success",
+    "engineer": "example-engineer",
+    "started_at": "2026-09-15T14:20:03Z",
+    "ended_at": "2026-09-15T14:24:37Z",
+    "total_tokens": 41205,
+    "total_cost": 0.0688,
+    "archived": 0
+  },
+  "phases": [
+    {
+      "seq": 1,
+      "name": "request",
+      "kind": "engineer",
+      "owner": "example-engineer",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 2,
+      "name": "plan",
+      "kind": "agent",
+      "owner": "planner",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    }
+  ]
+}

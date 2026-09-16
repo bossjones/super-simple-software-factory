@@ -1,0 +1,40 @@
+[
+  {
+    "phase": "plan",
+    "attempt": 1,
+    "gate": "artifacts_exist",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/a2b4d1c9/context_handoff/plan.md",
+        "ok": true,
+        "note": "exists, 3.9KB"
+      },
+      {
+        "item": "specs/a2b4d1c9_quality_argv_detection.md",
+        "ok": true,
+        "note": "exists, 3.9KB"
+      }
+    ]
+  },
+  {
+    "phase": "plan",
+    "attempt": 1,
+    "gate": "files_non_empty",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/a2b4d1c9/context_handoff/plan.md",
+        "ok": true,
+        "note": "3.9KB"
+      },
+      {
+        "item": "specs/a2b4d1c9_quality_argv_detection.md",
+        "ok": true,
+        "note": "3.9KB"
+      }
+    ]
+  }
+]

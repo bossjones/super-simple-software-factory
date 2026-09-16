@@ -1,0 +1,14 @@
+{
+  "agent_name": "planner",
+  "purpose": "Turn a request into a plan the builder can implement without asking questions.",
+  "output_type": "PlanOutput",
+  "attempt": 1,
+  "status": "success",
+  "summary": "Plan adds a detect_test_argv() step to install.py that rewrites the test placeholder for pytest, bun, and npm projects, with one fixture test per branch.",
+  "artifacts": [
+    "adws/adw_data/sessions/a2b4d1c9/context_handoff/plan.md",
+    "specs/a2b4d1c9_quality_argv_detection.md"
+  ],
+  "commit_message": "Add spec for detecting the test command at install time",
+  "notes_for_next_agent": "Detection must only read pyproject.toml, package.json, and bun.lock at the target root. Keep quality.py's _placeholder() so the lint/typecheck/build blocks are unchanged; only the test block's argv is rewritten, by a marker comment the installer replaces. Add --no-detect to install.py as the override."
+}

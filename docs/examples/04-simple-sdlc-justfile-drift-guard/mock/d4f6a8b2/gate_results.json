@@ -1,0 +1,101 @@
+[
+  {
+    "phase": "plan",
+    "attempt": 1,
+    "gate": "artifacts_exist",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/d4f6a8b2/context_handoff/plan.md",
+        "ok": true,
+        "note": "exists, 2.7KB"
+      },
+      {
+        "item": "specs/d4f6a8b2_justfile_drift_guard.md",
+        "ok": true,
+        "note": "exists, 2.7KB"
+      }
+    ]
+  },
+  {
+    "phase": "build",
+    "attempt": 1,
+    "gate": "diff_matches_claims",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "tests/test_plugin_layout.py",
+        "ok": true,
+        "note": "in the diff"
+      }
+    ]
+  },
+  {
+    "phase": "review_1",
+    "attempt": 1,
+    "gate": "artifacts_exist",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/d4f6a8b2/context_handoff/review.md",
+        "ok": true,
+        "note": "exists, 1.1KB"
+      }
+    ]
+  },
+  {
+    "phase": "review_1",
+    "attempt": 1,
+    "gate": "verdict_consistent",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "approved",
+        "ok": true,
+        "note": "true with 0 unmet findings and 0 blocking items"
+      }
+    ]
+  },
+  {
+    "phase": "document",
+    "attempt": 1,
+    "gate": "artifacts_exist",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/d4f6a8b2/context_handoff/document.md",
+        "ok": true,
+        "note": "exists, 1.8KB"
+      },
+      {
+        "item": "app_docs/d4f6a8b2_justfile_drift_guard.md",
+        "ok": true,
+        "note": "exists, 1.8KB"
+      }
+    ]
+  },
+  {
+    "phase": "document",
+    "attempt": 1,
+    "gate": "files_non_empty",
+    "passed": true,
+    "violations": [],
+    "checks": [
+      {
+        "item": "adws/adw_data/sessions/d4f6a8b2/context_handoff/document.md",
+        "ok": true,
+        "note": "1.8KB"
+      },
+      {
+        "item": "app_docs/d4f6a8b2_justfile_drift_guard.md",
+        "ok": true,
+        "note": "1.8KB"
+      }
+    ]
+  }
+]

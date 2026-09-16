@@ -1,0 +1,18 @@
+{
+  "agent_name": "documenter",
+  "purpose": "Write up the change that was just made, from the diff; document only.",
+  "output_type": "DocumentOutput",
+  "attempt": 1,
+  "status": "success",
+  "summary": "Documented the new drift guard, what it checks in both directions, and how to extend the allowlist.",
+  "document_path": "app_docs/d4f6a8b2_justfile_drift_guard.md",
+  "documented_files": [
+    "tests/test_plugin_layout.py"
+  ],
+  "artifacts": [
+    "adws/adw_data/sessions/d4f6a8b2/context_handoff/document.md",
+    "app_docs/d4f6a8b2_justfile_drift_guard.md"
+  ],
+  "commit_message": "Document the stamped justfile drift guard",
+  "notes_for_next_agent": "The diff did not explain why adw_quality has no recipe; the allowlist reason covers it but a future request could add a `quality` recipe."
+}

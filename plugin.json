@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "sssf",
+  "version": "1.0.0",
+  "description": "Install and operate deterministic agents-plus-code software factory workflows."
+}

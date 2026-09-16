@@ -1,0 +1,73 @@
+# Copilot-native agent roster: one agent, one prompt, one purpose.
+defaults:
+  model: gpt-5.4
+  reasoning_effort: medium
+  context_tier: default
+  tools: [view, rg, glob, bash, apply_patch]
+  skill_directories: []
+  plugin_directories: []
+  mcp_servers: {}
+  timeouts:
+    phase_seconds: 1800
+    tool_seconds: 300
+    correction_seconds: 300
+  # Off-limits to every agent that does not name them in its own `writes`.
+  protected_files:
+    - adws/adw_modules/
+    - adws/adw_sssf_config/
+    - adws/adw_*.py
+  data_dir: adws/adw_data
+
+observability:
+  db: adws/adw_data/sssf.db
+  poll_ms: 500
+
+agents:
+  - name: planner
+    reasoning_effort: high
+    color: "#a78bfa"
+    purpose: Turn a request into a plan the builder can implement without asking questions.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/planner/system.md
+      user: adws/adw_data/prompt_engineering/planner/user.md
+    writes:
+      - specs/
+
+  - name: builder
+    color: "#22d3ee"
+    purpose: Implement the plan exactly; report every changed file in the envelope.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/builder/system.md
+      user: adws/adw_data/prompt_engineering/builder/user.md
+
+  - name: scout
+    color: "#fbbf24"
+    purpose: Find and report where things live; change nothing.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/scout/system.md
+      user: adws/adw_data/prompt_engineering/scout/user.md
+    writes: []
+
+  # No tester agent: running the suite is a known command, so it is a kind="code"
+  # phase over adw_modules/quality.py. See SKILL.md hard rule 8.
+
+  - name: reviewer
+    reasoning_effort: high
+    color: "#fb7185"
+    purpose: Confirm that what was built is what was asked for; change nothing.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/reviewer/system.md
+      user: adws/adw_data/prompt_engineering/reviewer/user.md
+    writes: []
+
+  - name: documenter
+    color: "#e879f9"
+    purpose: Write up the change that was just made, from the diff; document only.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/documenter/system.md
+      user: adws/adw_data/prompt_engineering/documenter/user.md
+    writes:
+      - app_docs/
+      - docs/
+      - "**/*.md"
+      - "*.md"

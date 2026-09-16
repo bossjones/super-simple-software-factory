@@ -1,0 +1,52 @@
+{
+  "session": {
+    "adw_id": "c3d5e7f1",
+    "adw_name": "adw_plan_build",
+    "request": "Add the `kill` recipe the run cookbook already promises",
+    "status": "success",
+    "engineer": "example-engineer",
+    "started_at": "2026-09-15T15:01:40Z",
+    "ended_at": "2026-09-15T15:12:09Z",
+    "total_tokens": 97314,
+    "total_cost": 0.1642,
+    "archived": 0
+  },
+  "phases": [
+    {
+      "seq": 1,
+      "name": "request",
+      "kind": "engineer",
+      "owner": "example-engineer",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 2,
+      "name": "plan",
+      "kind": "agent",
+      "owner": "planner",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    },
+    {
+      "seq": 3,
+      "name": "build",
+      "kind": "agent",
+      "owner": "builder",
+      "status": "success",
+      "attempt": 2,
+      "retries": 1
+    },
+    {
+      "seq": 4,
+      "name": "commit",
+      "kind": "code",
+      "owner": "git",
+      "status": "success",
+      "attempt": 1,
+      "retries": 0
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "agent_name": "reviewer",
+  "purpose": "Confirm that what was built is what was asked for; change nothing.",
+  "output_type": "ReviewOutput",
+  "attempt": 1,
+  "status": "success",
+  "approved": true,
+  "summary": "4 of 4 requirements met.",
+  "artifacts": [
+    "adws/adw_data/sessions/d4f6a8b2/context_handoff/review.md"
+  ],
+  "notes_for_next_agent": "Verify by running the focused test target; the allowlist reasons are one line each as requested.",
+  "findings": [
+    {
+      "requirement": "Parse the template justfile for every adws/adw_*.py path",
+      "met": true,
+      "evidence": "tests/test_plugin_layout.py: JUSTFILE_ADW = re.compile(r\"adws/(adw_[a-z_]+)\\.py\") applied to the template text"
+    },
+    {
+      "requirement": "Assert each referenced script exists under templates/adws/",
+      "met": true,
+      "evidence": "tests/test_plugin_layout.py: assert missing == [] over (TEMPLATES / 'adws' / f'{name}.py').exists()"
+    },
+    {
+      "requirement": "Assert every stamped ADW is recipe-reachable or allowlisted with a reason",
+      "met": true,
+      "evidence": "tests/test_plugin_layout.py: UNRECIPED_ADWS dict with six entries, reverse assertion over glob('adw_*.py')"
+    },
+    {
+      "requirement": "Touch only tests/test_plugin_layout.py",
+      "met": true,
+      "evidence": "git diff --name-only shows one file"
+    }
+  ],
+  "blocking": []
+}
