@@ -5,6 +5,15 @@ own sequencing, retries, gates, permissions, traceability, and acceptance;
 GitHub Copilot performs the bounded work that needs reading, judgement, or code
 generation.
 
+## How a run flows
+
+The swimlane below shows how a request moves through SSSF phases over time,
+including completed, running, and queued work.
+
+<p align="center">
+  <img src="images/00_swimlane_waterfall.svg" alt="SSSF swimlane waterfall showing request, branch, plan, build, review, and queued commit phases over time" width="900">
+</p>
+
 The repository is an Agent Plugins 1.0 package. The distributable skill lives
 at `skills/sssf/`; that is the canonical path for scripts, cookbooks,
 references, templates, and the generated runtime.
